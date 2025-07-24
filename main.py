@@ -28,10 +28,10 @@ print("#########################################################################
 print("Iniciando o script principal (main.py) para otimização do guia de onda...")
 print("#########################################################################")
 # --- Definição dos Ranges de Parâmetros Construtivos ---
-s_range = (0.01e-6, 0.5e-6)   
-w_range = (0.2e-6, 1.2e-6)    
-l_range = (0.01e-6, 1.5e-6)    
-height_range = (0.1e-6, 0.5e-6) 
+s_range = (0.01e-6, 0.5e-6)   #Artigo: 0.15e-6
+w_range = (0.2e-6, 1.2e-6)    #Artigo: 0.5e-6
+l_range = (0.01e-6, 0.5e-6)    #Artigo: 0.15e-6
+height_range = (0.1e-6, 0.5e-6) #Artigo: 0.22e-6
 
 # --- Configuração do Algoritmo Genético ---
 population_size = 4

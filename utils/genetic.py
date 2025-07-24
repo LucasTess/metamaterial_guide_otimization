@@ -17,66 +17,62 @@ class GeneticOptimizer:
         self.best_individual = None
         self.best_fitness = -float('inf')
 
-        # Definir os valores de referência do artigo AQUI
         self.reference_params = {
             's': 0.15e-6,
             'w': 0.5e-6,
             'l': 0.15e-6,
             'height': 0.22e-6
         }
-        # Definir a amplitude da variação inicial/mutação em torno dos valores de referência
-        # Por exemplo, 10% do valor de referência para mutação/inicialização localizada
         self.initial_mutation_amplitude = {
-            's': 0.5 * self.reference_params['s'], # Ex: 50%
+            's': 0.5 * self.reference_params['s'],
             'w': 0.5 * self.reference_params['w'],
             'l': 0.5 * self.reference_params['l'],
             'height': 0.5 * self.reference_params['height']
         }
+        # Define a amplitude da mutação "local" como uma porcentagem do range total
+        self.local_mutation_step = {
+            param: (self.param_ranges[param][1] - self.param_ranges[param][0]) * 0.05
+            for param in self.param_ranges
+        }
 
 
     def _constrain_param(self, param_name, value):
-        """Garanta que o valor esteja dentro dos ranges definidos."""
         min_val, max_val = self.param_ranges[param_name]
         return max(min_val, min(max_val, value))
 
 
-    def create_chromosome(self):
-        chromosome = {
-            's': random.uniform(*self.param_ranges['s']),
-            'w': random.uniform(*self.param_ranges['w']),
-            'l': random.uniform(*self.param_ranges['l']),
-            'height': random.uniform(*self.param_ranges['height'])
-        }
-        return chromosome
-
-    def initialize_population(self):
-        """
-        Inicializa a primeira população.
-        Alguns cromossomos serão aleatórios, outros baseados nos valores do artigo.
-        """
-        self.population = []
-        num_ref_chromosomes = max(1, self.population_size // 5) # Ex: 20% da população inicia perto da referência
-
-        # Adiciona cromossomos baseados nos valores de referência
-        for _ in range(num_ref_chromosomes):
-            new_chrom = {}
+    def create_chromosome(self, reference_based=False):
+        chromosome = {}
+        if reference_based:
             for param, ref_val in self.reference_params.items():
-                # Pequena variação em torno do valor de referência
                 variation_amplitude = self.initial_mutation_amplitude[param]
                 val = random.uniform(ref_val - variation_amplitude, ref_val + variation_amplitude)
-                new_chrom[param] = self._constrain_param(param, val) # Garante que está dentro do range geral
-            self.population.append(new_chrom)
+                chromosome[param] = self._constrain_param(param, val)
+        else:
+            for param in self.param_ranges:
+                chromosome[param] = random.uniform(*self.param_ranges[param])
+        return chromosome
 
-        # Preenche o restante da população com cromossomos completamente aleatórios
-        while len(self.population) < self.population_size:
-            self.population.append(self.create_chromosome())
 
-        random.shuffle(self.population) # Mistura a população inicial
+    def initialize_population(self):
+        self.population = []
+        num_ref_based = self.population_size // 2  # Metade da população baseada em referência
+        num_random = self.population_size - num_ref_based # A outra metade aleatória
+
+        for _ in range(num_ref_based):
+            self.population.append(self.create_chromosome(reference_based=True))
+
+        for _ in range(num_random):
+            self.population.append(self.create_chromosome(reference_based=False))
+
+        random.shuffle(self.population)
+
 
     def calculate_fitness(self, delta_amp):
         if np.isinf(delta_amp) or np.isnan(delta_amp):
             return -float('inf')
         return delta_amp
+
 
     def select_parents(self):
         pool = random.sample(self.population, min(5, len(self.population)))
@@ -86,6 +82,7 @@ class GeneticOptimizer:
         parent2 = max(pool, key=lambda x: x.get('fitness', -float('inf')))
 
         return parent1, parent2
+
 
     def crossover(self, parent1, parent2):
         child1 = {}
@@ -103,28 +100,25 @@ class GeneticOptimizer:
         
         return child1, child2
 
-    def mutate(self, chromosome):
-        """
-        Aplica mutação a um cromossomo.
-        A mutação agora pode ser mais direcionada (pequena variação) ou aleatória (grande salto).
-        """
+
+    def mutate(self, chromosome, mutation_type='local'):
         if random.random() < self.mutation_rate:
             param_to_mutate = random.choice(list(self.param_ranges.keys()))
             param_range = self.param_ranges[param_to_mutate]
             current_val = chromosome[param_to_mutate]
 
-            # Decidir se a mutação é um pequeno ajuste ou um salto maior
-            if random.random() < 0.8: # 80% de chance de pequena mutação (ajuste o percentual)
-                # Mutação pequena: variação em torno do valor atual
-                # A amplitude da variação diminui com o tempo/gerações, se desejar
-                mutation_step = (param_range[1] - param_range[0]) * 0.05 # Ex: 5% do range total
+            if mutation_type == 'local':
+                mutation_step = self.local_mutation_step[param_to_mutate]
                 new_val = current_val + random.uniform(-mutation_step, mutation_step)
-            else:
-                # Mutação maior: valor aleatório dentro do range total
+            elif mutation_type == 'global':
                 new_val = random.uniform(*param_range)
+            else: # Fallback to local if unknown type
+                mutation_step = self.local_mutation_step[param_to_mutate]
+                new_val = current_val + random.uniform(-mutation_step, mutation_step)
             
             chromosome[param_to_mutate] = self._constrain_param(param_to_mutate, new_val)
         return chromosome
+
 
     def evolve(self, current_generation_delta_amps):
         if len(current_generation_delta_amps) != len(self.population):
@@ -142,13 +136,26 @@ class GeneticOptimizer:
             elite_chromosome = {k: self.best_individual[k] for k in self.param_ranges.keys()}
             new_population.append(elite_chromosome)
 
-        while len(new_population) < self.population_size:
+        # Preencher o restante da nova população mantendo a proporção de mutação
+        num_to_generate = self.population_size - len(new_population)
+        num_local_mutations = num_to_generate // 2
+        num_global_mutations = num_to_generate - num_local_mutations
+
+        # Gera filhos com mutação "local" (próximo ao ponto atual)
+        for _ in range(num_local_mutations):
             parent1, parent2 = self.select_parents()
-            child1, child2 = self.crossover(parent1, parent2)
-            child1 = self.mutate(child1)
-            child2 = self.mutate(child2)
-            new_population.extend([child1, child2])
-        
+            child1, _ = self.crossover(parent1, parent2) # Pega apenas um filho
+            child1 = self.mutate(child1, mutation_type='local')
+            new_population.append(child1)
+
+        # Gera filhos com mutação "global" (exploração ampla)
+        for _ in range(num_global_mutations):
+            parent1, parent2 = self.select_parents()
+            _, child2 = self.crossover(parent1, parent2) # Pega o outro filho
+            child2 = self.mutate(child2, mutation_type='global')
+            new_population.append(child2)
+
+        random.shuffle(new_population) # Mistura para evitar vieses de ordem
         self.population = new_population[:self.population_size]
 
         return [{k: chrom[k] for k in self.param_ranges.keys()} for chrom in self.population]
