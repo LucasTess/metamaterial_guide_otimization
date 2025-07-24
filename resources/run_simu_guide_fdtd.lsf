@@ -1,0 +1,133 @@
+# run_simu_guide_fdtd.lsf
+
+clc;
+
+##########################################################################################################
+# Define os parametros de simulacao
+
+# === LEIA OS PARAMETROS DAS USER PROPERTIES AQUI ===
+# Acessa as propriedades do grupo "Guia Metamaterial" diretamente pelo nome completo.
+# Esta eh a forma mais robusta de acessar as user properties de um objeto nomeado.
+
+height = getnamed("Guia Metamaterial", "height");
+w = getnamed("Guia Metamaterial", "w");
+l = getnamed("Guia Metamaterial", "l");
+s = getnamed("Guia Metamaterial", "s");
+total_length = getnamed("Guia Metamaterial", "total_length");
+# Adicionado para depuração:
+? "Valores dos parametros lidos em run_simu_guide_fdtd.lsf:";
+? "s: " + num2str(s);
+? "w: " + num2str(w);
+? "l: " + num2str(l);
+? "Height: " + num2str(height);
+# Recalculando posição final para os monitores e portas
+substrate_x_max = total_length / 2; 
+delta = l+s;
+num_segments_guide_approx = total_length / delta;
+num_segments_guide_teorical = round(num_segments_guide_approx);
+start = 0 - total_length/2 +l/2;
+for(i= 0:1:num_segments_guide_teorical){
+    if((start + ((i)*delta) + l/2) <= substrate_x_max){
+        num_segments_guide_real = i;        
+        last_x = start + i*delta;                 
+        }
+    }
+? "num_segments_guide_real: " + num2str(num_segments_guide_real); 
+? "start: " + num2str(start);
+? "last_x: " + num2str(last_x);
+
+
+
+sim_time = 1000e-15;
+points = 500;
+mesh_accuracy = 3;
+addfdtd;
+set("dimension",2);
+set("simulation time", sim_time);
+set("x",0);
+set("x span", total_length*1.1);
+set("y",0);
+set("y span",w*5.5);
+set("z", 0);
+set("z span", max([height*4; 1e-6]));
+set("background material", 'Agua_deion');
+
+set("mesh accuracy", mesh_accuracy);
+
+setglobalsource("wavelength start", 1.45e-6);
+setglobalsource("wavelength stop", 1.62e-6);
+setglobalsource("optimize for short pulse", 0);
+
+amplitude = 3;
+addport;
+set("name","in");
+setnamed("FDTD::ports::in", "amplitude", amplitude);
+setnamed("FDTD::ports::in", "x", start);
+setnamed("FDTD::ports::in", "y",0);
+setnamed("FDTD::ports::in", "y span", 4*w);
+setnamed("FDTD::ports::in", "z",0);
+setnamed("FDTD::ports::in", "z span", 4*height);
+setnamed("FDTD::ports::in", "direction", "Forward");
+
+addport;
+set("name","through");
+setnamed("FDTD::ports::through", "amplitude", amplitude);
+setnamed("FDTD::ports::through", "x", last_x);
+setnamed("FDTD::ports::through", "y", 0);
+setnamed("FDTD::ports::through", "y span", 4*w);
+setnamed("FDTD::ports::through", "z",0);
+setnamed("FDTD::ports::through", "z span", 4*height);
+setnamed("FDTD::ports::through", "direction", "Backward");
+
+setnamed("FDTD::ports", "monitor frequency points", points);
+setglobalmonitor("frequency points", points);
+
+#m_pos = 10*delta;
+addprofile ;
+set("name","in");
+set("monitor type",1);
+set("x", start);
+set("y", 0);
+set("z", 0);
+
+
+#addprofile ;
+#set("name","through");
+#set("monitor type",1);
+#set("x", last_x);
+#set("y", 0);
+#set("z", 0);
+
+#addmodeexpansion;
+#set("name","in_mode_high");
+#set("x", start+delta);
+#set("y", 0);
+#set("y span", 4*w);
+#set("z",0);
+#set("z span", 4*height);
+
+#addmodeexpansion;
+#set("name","in_mode_low");
+#set("x", start+3*delta/2);
+#set("y", 0);
+#set("y span", 4*w);
+#set("z",0);
+#set("z span", 4*height);
+
+#addmodeexpansion;
+#set("name","through_mode_high");
+#set("x", last_x-delta );
+#set("y", 0);
+#set("y span", 4*w);
+#set("z",0);
+#set("z span", 4*height);
+
+#addmodeexpansion;
+#set("name","through_mode_low");
+#set("x", last_x-3*delta/2 );
+#set("y", 0);
+#set("y span", 4*w);
+#set("z",0);
+#set("z span", 4*height);
+
+run;
