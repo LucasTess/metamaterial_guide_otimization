@@ -23,7 +23,7 @@ def run_lumerical_workflow(fdtd, current_s_value, current_w_value, current_l_val
     #actual_s_in_lumerical = fdtd.getnamed('Guia Metamaterial', 's')
     #print(f"DEBUG: s no Lumerical: {actual_s_in_lumerical:.2e}")
 
-    fdtd.save(fsp_path)
+    #fdtd.save(fsp_path, True)
 
     with open(run_sim_lsf_path, 'r') as f:
         run_sim_lsf_content = f.read()
