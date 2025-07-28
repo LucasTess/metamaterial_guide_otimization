@@ -26,8 +26,8 @@ set("x",0);
 set("x span", total_length*1.2);
 set("y", 0);
 set("y span", 10e-6);
-set("z", 0.02e-6);
-set("z span", 0.42e-6);
+set("z", 0);
+set("z span", 0.8e-6);
 set("alpha", 0.4);
 
 
@@ -42,10 +42,10 @@ adduserprop("total_length", 2, total_length); # Pode ser um valor inicial ou 0 s
 adduserprop("index", 0, 3.5);
 adduserprop("material", 5, 'Si (Silicon) - Palik');
 adduserprop("base_width", 2, 0.150e-6);
-adduserprop("height", 2, 2.73e-7);
-adduserprop("w", 2, 6.76e-7);
-adduserprop("l", 2, 1.85e-6);
-adduserprop("s", 2, 9.11e-8);
+adduserprop("height", 2, 0.5e-6);
+adduserprop("w", 2, 7.34e-07);
+adduserprop("l", 2, 1.85e-7);
+adduserprop("s", 2, 1.85e-07);
 #adduserprop("last_x", 2, 0); 
 
 #Escreve o script

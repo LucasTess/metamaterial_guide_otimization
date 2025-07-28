@@ -3,7 +3,7 @@
 import sys
 import os
 import random # Usado para gerar IDs de simulação
-import time   # Para pausas e simulação de tempo
+import datetime  # Para pausas e simulação de tempo
 
 # --- Configuração do Python Path para o Lumerical API ---
 _lumapi_module_path = "C:\\Program Files\\Lumerical\\v241\\api\\python"
@@ -15,7 +15,7 @@ if _lumapi_module_path not in sys.path:
 from utils.lumerical_workflow import run_lumerical_workflow 
 from utils.post_processing import calculate_delta_amp     
 from utils.genetic import GeneticOptimizer                
-
+from utils.experiment_end import record_experiment_results
 # --- Configurações Globais ---
 _project_directory = "C:\\Users\\USUARIO\\OneDrive\\Lumerical\\metamaterial_guide_otimization"
 _fsp_file_name = "guide.fsp"
@@ -34,9 +34,9 @@ l_range = (0.01e-6, 0.5e-6)    #Artigo: 0.15e-6
 height_range = (0.1e-6, 0.5e-6) #Artigo: 0.22e-6
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 4
-mutation_rate = 0.1
-num_generations = 4 
+population_size = 3
+mutation_rate = 0.2
+num_generations = 1 
 
 # Instancia o otimizador genético
 optimizer = GeneticOptimizer(
@@ -47,7 +47,7 @@ optimizer = GeneticOptimizer(
 # --- Inicializa a primeira população ---
 optimizer.initialize_population()
 current_chromosomes_for_sim = [{k: chrom[k] for k in ['s', 'w', 'l', 'height']} for chrom in optimizer.population]
-
+experiment_start_time = datetime.datetime.now()
 fdtd_session = None 
 try:
     # --- Loop Principal de Otimização (Gerações) ---
@@ -109,6 +109,13 @@ try:
     else:
         print("Nenhum melhor indivíduo encontrado durante a otimização.")
 
+    # --- Chama a função para registrar os resultados do experimento ---
+    record_experiment_results(
+        _simulation_spectra_directory, # Salva o CSV no mesmo diretório dos espectros
+        optimizer,
+        experiment_start_time,
+        s_range, w_range, l_range, height_range
+    )
 except Exception as e:
     print(f"!!! Erro fatal no script principal de otimização: {e}")
 

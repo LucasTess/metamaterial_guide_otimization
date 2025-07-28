@@ -31,7 +31,7 @@ else{
             set('x span', l);
             set("y", 0);
             set('y span', w);
-            set("z", 0);
+            set("z", -0.11e-6 + height/2);
             set('z span', height);
             set("name", "guide_segment" + num2str(i));
             #if(i == (num_segments_guide-1)){
@@ -50,7 +50,7 @@ set("material",material);
 if(material=="<Object defined dielectric>") {
 set("index",index);
 }
-set("z",0);
-set("z span",height);
+#set("z",0);
+#set("z span",height);
    
 

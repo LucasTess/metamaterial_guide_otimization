@@ -41,16 +41,11 @@ def calculate_delta_amp(output_h5_path, monitor_name='in'):
 
         return total_delta_amp
 
-# if __name__ == '__main__':
-#     # --- Exemplo de Uso (para teste local e modularidade) ---
-#     _project_directory = "C:\\Users\\USUARIO\\OneDrive\\Lumerical\\metamaterial_guide_otimization"
-#     _spectra_directory = os.path.join(_project_directory, "simulation_spectra")
-
-#     # Exemplo de nome de arquivo para um cromossomo hipotético
-#     # O main.py passará o 'simulation_id' para gerar o nome do arquivo.
-#     _test_simulation_id = "s_1.50e-07" 
-
-#     output_h5_path = "in_monitor_crom_gen2_chrom2.h5"
-#     output_h5_path = os.path.join(_spectra_directory, output_h5_path)
-#     delta_amp_value = calculate_delta_amp(output_h5_path, monitor_name='in')
-#     print(f"Delta Amplitude Acumulada para o arquivo de teste ({output_h5_path}): {delta_amp_value:.4f}")
+if __name__ == '__main__':
+     # --- Exemplo de Uso (para teste local e modularidade) ---
+     _project_directory = "C:\\Users\\USUARIO\\OneDrive\\Lumerical\\metamaterial_guide_otimization"
+     _spectra_directory = os.path.join(_project_directory, "simulation_spectra")
+     output_h5_path = "current_monitor_data.h5"
+     output_h5_path = os.path.join(_spectra_directory, output_h5_path)
+     delta_amp_value = calculate_delta_amp(output_h5_path, monitor_name='in')
+     print(f"Delta Amplitude Acumulada para o arquivo de teste ({output_h5_path}): {delta_amp_value:.4f}")

@@ -58,25 +58,12 @@ def plot_single_h5_spectrum(file_path, monitor_name='in'):
         print(f"Ocorreu um erro ao processar o arquivo '{file_path}': {e}")
 
 if __name__ == "__main__":
-    # --- Configurações para o Caminho do Arquivo ---
     # Defina o diretório base do seu projeto
     _project_directory = "C:\\Users\\USUARIO\\OneDrive\\Lumerical\\metamaterial_guide_otimization"
-    
     # Defina o subdiretório onde os arquivos .h5 são salvos
     _simulation_spectra_directory = os.path.join(_project_directory, "simulation_spectra")
-
-    # --- Escolha um arquivo .h5 para plotar ---
-    # Você precisará alterar este nome de arquivo para um dos seus arquivos reais.
-    # Por exemplo, "in_monitor_gen1_chrom1.h5" se for da primeira geração, primeiro cromossomo.
-    # Certifique-se de que o arquivo realmente exista no diretório!
+    chosen_file =os.path.join(_simulation_spectra_directory, 'current_monitor_data.h5') 
     
-    # Exemplo: Tente plotar o primeiro arquivo .h5 que encontrar
-    chosen_file = 'in_monitor_gen1_chrom1.h5'
-    for filename in os.listdir(_simulation_spectra_directory):
-        if filename.endswith(".h5") and filename.startswith("in_monitor_"):
-            chosen_file = os.path.join(_simulation_spectra_directory, filename)
-            break
-
     if chosen_file:
         print(f"Tentando plotar o arquivo: {chosen_file}")
         plot_single_h5_spectrum(chosen_file, monitor_name='in')
