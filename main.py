@@ -37,6 +37,7 @@ def signal_handler(sig, frame):
     print("\nCtrl+C detectado! Sinalizando threads para parar...")
     stop_simulation_event.set()
 
+
 signal.signal(signal.SIGINT, signal_handler)
 
 print("#########################################################################")
@@ -52,7 +53,11 @@ height_range = (0.1e-6, 0.5e-6)
 # --- Configuração do Algoritmo Genético ---
 population_size = 6
 mutation_rate = 0.2
-num_generations = 2
+num_generations = 10 # Limite máximo de gerações
+
+# --- Critério de Convergência ---
+enable_convergence_check = True 
+convergence_threshold_percent = 5.0 # Porcentagem de mudança mínima para continuar
 
 # --- Configuração de Multithreading ---
 _max_simultaneous_lumerical_sessions = 3
@@ -72,17 +77,15 @@ optimizer = GeneticOptimizer(
 )
 
 # --- Inicializa o ParallelChromosomeSimulator ---
-# Passa todas as configurações necessárias para o construtor da classe
 parallel_simulator = ParallelChromosomeSimulator(
     max_simultaneous_sessions=_max_simultaneous_lumerical_sessions,
     stop_event=stop_simulation_event,
-    project_directory=_project_directory, # Embora não diretamente usado pela classe, é bom manter aqui se for necessário no futuro
+    project_directory=_project_directory,
     temp_fsp_paths=temp_fsp_paths,
     create_lsf_script_file_name=_create_lsf_script_file_name,
     run_sim_lsf_script_file_name=_run_sim_lsf_script_file_name,
     simulation_spectra_directory=_simulation_spectra_directory
 )
-
 
 # --- Inicializa a primeira população ---
 optimizer.initialize_population()
@@ -90,9 +93,14 @@ current_chromosomes_for_sim = [{k: chrom[k] for k in ['s', 'w', 'l', 'height']} 
 
 experiment_start_time = datetime.datetime.now()
 
+previous_best_fitness = -float('inf') 
+generations_processed = 0 # <--- NOVO: Contador de gerações processadas
+
 try:
     # --- Loop Principal de Otimização (Gerações) ---
     for gen_num in range(num_generations):
+        generations_processed += 1 # Incrementa o contador para cada geração tentada
+        
         if stop_simulation_event.is_set():
             print("Sinal de parada detectado. Encerrando otimização.")
             break
@@ -100,7 +108,6 @@ try:
         print(f"\n--- Processando Geração {gen_num + 1}/{num_generations} ---")
         print(f"  Simulando {len(current_chromosomes_for_sim)} cromossomos em paralelo (até {_max_simultaneous_lumerical_sessions} por vez)...")
 
-        # Chama o método da instância para simular a geração
         delta_amp_results_for_gen = parallel_simulator.simulate_generation(current_chromosomes_for_sim)
 
         if stop_simulation_event.is_set():
@@ -114,6 +121,36 @@ try:
             print(f"!!! Erro na evolução da população: {e}")
             break
 
+        # --- LÓGICA DE CONVERGÊNCIA (CONDICIONAL) ---
+        if enable_convergence_check: # <--- Só executa se a checagem estiver ativada
+            current_best_fitness = optimizer.best_fitness
+
+            # A partir da segunda geração (gen_num > 0)
+            if gen_num > 0:
+                if previous_best_fitness == -float('inf'):
+                    print("  [Convergência] Fitness anterior não válido, continuando...")
+                elif current_best_fitness == previous_best_fitness:
+                    print(f"  [Convergência] Melhor fitness da geração atual ({current_best_fitness:.4e}) é idêntico ao anterior. Convergência atingida.")
+                    break
+                elif previous_best_fitness != 0:
+                    percentage_change = abs((current_best_fitness - previous_best_fitness) / previous_best_fitness) * 100
+                    
+                    print(f"  [Convergência] Melhor fitness da geração atual: {current_best_fitness:.4e}")
+                    print(f"  [Convergência] Melhor fitness da geração anterior: {previous_best_fitness:.4e}")
+                    print(f"  [Convergência] Mudança de fitness em relação à geração anterior: {percentage_change:.2f}%")
+
+                    if percentage_change <= convergence_threshold_percent:
+                        print(f"  [Convergência] Mudança percentual ({percentage_change:.2f}%) é menor ou igual ao limiar ({convergence_threshold_percent:.2f}%). Convergência atingida.")
+                        break
+            
+            # Atualiza o melhor fitness anterior para a próxima iteração
+            previous_best_fitness = current_best_fitness
+        else:
+            print("  [Convergência] Checagem de convergência desativada. Continuar até o número máximo de gerações.")
+            # Se a checagem estiver desativada, ainda precisamos atualizar previous_best_fitness para a próxima iteração
+            # caso ela seja reativada, ou para fins de depuração.
+            previous_best_fitness = optimizer.best_fitness # Mesmo se não usar, mantenha atualizado
+
     print("\n--- Otimização Concluída ---")
     if optimizer.best_individual:
         print(f"Melhor cromossomo encontrado: {optimizer.best_individual}")
@@ -121,11 +158,13 @@ try:
     else:
         print("Nenhum melhor indivíduo encontrado durante a otimização.")
 
+    # Passa o número de gerações realmente processadas
     record_experiment_results(
         _simulation_spectra_directory,
         optimizer,
         experiment_start_time,
-        s_range, w_range, l_range, height_range
+        s_range, w_range, l_range, height_range,
+        generations_processed # <--- NOVO ARGUMENTO
     )
 
 except Exception as e:

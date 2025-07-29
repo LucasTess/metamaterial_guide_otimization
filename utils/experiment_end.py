@@ -2,70 +2,65 @@
 
 import os
 import datetime
+import json
+import matplotlib.pyplot as plt
 import numpy as np
+
 def record_experiment_results(
-    output_dir,
-    optimizer_instance,
-    start_time,
-    s_range, w_range, l_range, height_range
+    output_directory, optimizer_instance, experiment_start_time,
+    s_range, w_range, l_range, height_range,
+    generations_processed # <--- NOVO ARGUMENTO
 ):
     """
-    Registra os resultados finais do experimento em um arquivo CSV.
-    Cada execução adiciona uma nova linha ao arquivo.
-
-    Args:
-        output_dir (str): Diretório onde o arquivo de resultados será salvo.
-        optimizer_instance (GeneticOptimizer): A instância do otimizador genético
-                                                após a conclusão das gerações.
-        start_time (float): O timestamp de início do experimento (time.time()).
-        s_range (tuple): Tupla (min, max) do range de s.
-        w_range (tuple): Tupla (min, max) do range de w.
-        l_range (tuple): Tupla (min, max) do range de l.
-        height_range (tuple): Tupla (min, max) do range de height.
+    Registra os resultados finais do experimento, incluindo o melhor cromossomo,
+    o histórico de fitness, e informações de configuração.
     """
-    results_file_path = os.path.join(output_dir, "optimization_results.csv")
-    
-    end_time = datetime.datetime.now()
-    duration_seconds = (end_time - start_time).total_seconds()
-    duration_hours = int(duration_seconds // 3600)
-    duration_minutes = int((duration_seconds % 3600) // 60)
+    experiment_end_time = datetime.datetime.now()
+    duration = experiment_end_time - experiment_start_time
 
-    # Coleta os dados do melhor indivíduo
-    best_s = optimizer_instance.best_individual['s'] if optimizer_instance.best_individual else np.nan
-    best_w = optimizer_instance.best_individual['w'] if optimizer_instance.best_individual else np.nan
-    best_l = optimizer_instance.best_individual['l'] if optimizer_instance.best_individual else np.nan
-    best_height = optimizer_instance.best_individual['height'] if optimizer_instance.best_individual else np.nan
-    best_delta_amp = optimizer_instance.best_fitness if optimizer_instance.best_fitness != -float('inf') else np.nan
+    results_file_name = f"experiment_results_{experiment_end_time.strftime('%Y%m%d_%H%M%S')}.json"
+    results_path = os.path.join(output_directory, results_file_name)
 
-    # Formata os ranges para uma string que o pandas possa ler facilmente
-    # Ex: "(0.01e-6, 0.5e-6)"
-    s_range_str = f"({s_range[0]:.2e}, {s_range[1]:.2e})"
-    w_range_str = f"({w_range[0]:.2e}, {w_range[1]:.2e})"
-    l_range_str = f"({l_range[0]:.2e}, {l_range[1]:.2e})"
-    height_range_str = f"({height_range[0]:.2e}, {height_range[1]:.2e})"
+    results_data = {
+        "experiment_start_time": experiment_start_time.isoformat(),
+        "experiment_end_time": experiment_end_time.isoformat(),
+        "total_duration": str(duration),
+        "total_generations_processed": generations_processed, # <--- INCLUÍDO AQUI
+        "population_size": optimizer_instance.population_size,
+        "mutation_rate": optimizer_instance.mutation_rate,
+        "max_generations_set": optimizer_instance.num_generations, # Geração máxima configurada
+        "best_individual": optimizer_instance.best_individual,
+        "best_fitness": optimizer_instance.best_fitness,
+        "s_range": s_range,
+        "w_range": w_range,
+        "l_range": l_range,
+        "height_range": height_range,
+        "fitness_history": optimizer_instance.fitness_history # Assumindo que o otimizador guarda isso
+    }
 
-    # Cabeçalho do CSV (se o arquivo não existir)
-    header = "Timestamp,Best_Delta_Amp,Best_s,Best_w,Best_l,Best_height,Num_Generations,Population_Size,Mutation_Rate,s_Range,w_Range,l_Range,height_Range,Duration_Hours,Duration_Minutes\n"
+    try:
+        with open(results_path, 'w') as f:
+            json.dump(results_data, f, indent=4)
+        print(f"\nResultados do experimento salvos em: {results_path}")
+    except Exception as e:
+        print(f"!!! Erro ao salvar resultados do experimento: {e}")
 
-    # Dados da linha atual
-    data_row = (
-        f"{end_time.strftime('%Y-%m-%d %H:%M:%S')},"
-        f"{best_delta_amp:.4e},"
-        f"{best_s:.4e},{best_w:.4e},{best_l:.4e},{best_height:.4e},"
-        f"{optimizer_instance.generations},"
-        f"{optimizer_instance.population_size},"
-        f"{optimizer_instance.mutation_rate},"
-        f"\"{s_range_str}\"," # Aspas para garantir que a tupla seja lida como uma string única
-        f"\"{w_range_str}\","
-        f"\"{l_range_str}\","
-        f"\"{height_range_str}\","
-        f"{duration_hours},{duration_minutes}\n"
-    )
-
-    # Escreve no arquivo (modo 'a' para append - adicionar ao final)
-    with open(results_file_path, 'a') as f:
-        if not os.path.exists(results_file_path) or os.path.getsize(results_file_path) == 0:
-            f.write(header) # Escreve o cabeçalho apenas se o arquivo for novo ou vazio
-        f.write(data_row)
-    
-    print(f"\nResultados do experimento salvos em: {results_file_path}")
+    # Plotar o histórico de fitness
+    if optimizer_instance.fitness_history:
+        plt.figure(figsize=(10, 6))
+        generations = range(1, len(optimizer_instance.fitness_history) + 1)
+        plt.plot(generations, optimizer_instance.fitness_history, marker='o', linestyle='-')
+        plt.title('Histórico do Melhor Fitness por Geração')
+        plt.xlabel('Geração')
+        plt.ylabel('Melhor Delta Amplitude')
+        plt.grid(True)
+        plot_file_name = f"fitness_history_{experiment_end_time.strftime('%Y%m%d_%H%M%S')}.png"
+        plot_path = os.path.join(output_directory, plot_file_name)
+        try:
+            plt.savefig(plot_path)
+            print(f"Gráfico do histórico de fitness salvo em: {plot_path}")
+        except Exception as e:
+            print(f"!!! Erro ao salvar gráfico do histórico de fitness: {e}")
+        plt.close() # Fecha a figura para liberar memória
+    else:
+        print("Nenhum histórico de fitness para plotar.")
