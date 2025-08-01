@@ -28,7 +28,7 @@ def record_experiment_results(
         "total_generations_processed": generations_processed, # <--- INCLUÍDO AQUI
         "population_size": optimizer_instance.population_size,
         "mutation_rate": optimizer_instance.mutation_rate,
-        "max_generations_set": optimizer_instance.num_generations, # Geração máxima configurada
+        "max_generations_set": optimizer_instance.generations, # Geração máxima configurada
         "best_individual": optimizer_instance.best_individual,
         "best_fitness": optimizer_instance.best_fitness,
         "s_range": s_range,

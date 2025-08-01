@@ -2,69 +2,84 @@
 
 import lumapi
 import os
-import numpy as np
 import h5py
+import numpy as np
+from .file_handler import remove_file
 
-def run_lumerical_workflow(fdtd, current_s_value, current_w_value, current_l_value,current_height_value,
-                            fsp_path, create_lsf_path, run_sim_lsf_path, output_h5_path):
+# ... (prepare_lumerical_job permanece inalterada) ...
 
-    fdtd.load(fsp_path)
-    fdtd.switchtolayout()
-
-    with open(create_lsf_path, 'r') as f:
-        create_lsf_content = f.read()
-    fdtd.eval(create_lsf_content)
-
-    fdtd.setnamed("Guia Metamaterial", "s", current_s_value)
-    fdtd.setnamed("Guia Metamaterial", "w", current_w_value)
-    fdtd.setnamed("Guia Metamaterial", "l", current_l_value)
-    fdtd.setnamed("Guia Metamaterial", "height", current_height_value)
-
-    #actual_s_in_lumerical = fdtd.getnamed('Guia Metamaterial', 's')
-    #print(f"DEBUG: s no Lumerical: {actual_s_in_lumerical:.2e}")
-
-    #fdtd.save(fsp_path, True)
-
-    with open(run_sim_lsf_path, 'r') as f:
-        run_sim_lsf_content = f.read()
-    fdtd.eval(run_sim_lsf_content)
-
-    monitor_names = ["in"]
-    output_results_dir = os.path.join(os.path.dirname(fsp_path), "simulation_spectra")
-    os.makedirs(output_results_dir, exist_ok=True)
-
-    simulation_spectra_data = {}
+def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geometry_lsf_path,
+                                  simulation_lsf_path, simulation_spectra_directory):
+    """
+    Prepara e executa as simulações para uma geração inteira de cromossomos usando a fila de jobs.
+    Após a execução, lê os resultados de cada arquivo FSP, salva em arquivos .h5 e os deleta.
     
-    # Obter os vetores de frequência e comprimento de onda do "spectrum" do monitor 'in'
-    try:
-        # Acessa o dataset 'spectrum' do monitor 'in' e pega o atributo 'f' e 'lambda'
-        frequencies_hz = fdtd.getdata("in","f")
-    except Exception as e:
-        print(f"ERRO CRITICO: Nao foi possivel obter 'f' ou 'lambda' do 'in:spectrum': {e}")
-        print("Verifique se o monitor 'in' existe e tem o 'spectrum' calculado.")
-        return # Sair da função se não conseguir o domínio de frequência
-
-    simulation_spectra_data['frequencies_hz'] = frequencies_hz
+    Args:
+        # ... (Parâmetros de entrada) ...
+        
+    Returns:
+        Uma lista completa dos caminhos para os arquivos de saída .h5.
+    """
+    fsp_paths_for_gen = []
+    print(f"Preparando e adicionando {len(current_population)} jobs na fila...")
     
-    for monitor_name in monitor_names:
+    for chromosome in current_population:
+        fsp_path = prepare_lumerical_job(
+            fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path
+        )
+        fsp_paths_for_gen.append(fsp_path)
+        
+        # Adiciona o arquivo FSP com nome único à fila de jobs
+        fdtd.addjob(fsp_path)
+    
+    print("\n  [Job Manager] Executando todos os jobs na fila. Isso pode levar um tempo...")
+    fdtd.runjobs()
+    print("  [Job Manager] Todos os jobs da geração foram concluídos. Lendo e salvando os resultados...")
+
+    # --- Pós-processamento e salvamento em disco no Python ---
+    output_h5_paths = []
+    monitor_name = 'in'
+    for fsp_path in fsp_paths_for_gen:
         try:
+            # Carrega o arquivo FSP já simulado para extrair os dados
+            fdtd.load(fsp_path)
+            
+            # Extrai os dados do monitor 'in'
             Ex_complex = fdtd.getdata(f"{monitor_name}","Ex")
             Ey_complex = fdtd.getdata(f"{monitor_name}","Ey")
             Ez_complex = fdtd.getdata(f"{monitor_name}","Ez")
 
-            spectrum_E_magnitude = np.sqrt(np.abs(Ex_complex[0,0,0,:])**2 
+            E = np.sqrt(np.abs(Ex_complex[0,0,0,:])**2 
                                            + np.abs(Ey_complex[0,0,0,:])**2 
                                            + np.abs(Ez_complex[0,0,0,:])**2)
+
+            f = fdtd.getdata("in","f")
             
-            spectrum_phase = np.angle(Ex_complex[0,0,0,:])
+            # Define o nome do arquivo H5 com base nos parâmetros do cromossomo
+            s_val = fdtd.getnamed("Guia Metamaterial", "s")
+            w_val = fdtd.getnamed("Guia Metamaterial", "w")
+            l_val = fdtd.getnamed("Guia Metamaterial", "l")
+            height_val = fdtd.getnamed("Guia Metamaterial", "height")
             
-            simulation_spectra_data[f'{monitor_name}_spectrum_E_magnitude'] = spectrum_E_magnitude
-            simulation_spectra_data[f'{monitor_name}_spectrum_phase'] = spectrum_phase
+            h5_file_name = f"spectrum_s{s_val:.2e}_w{w_val:.2e}_l{l_val:.2e}_h{height_val:.2e}.h5"
+            h5_path = os.path.join(simulation_spectra_directory, h5_file_name)
+            
+            # Salva os dados no arquivo H5 usando a biblioteca h5py
+            with h5py.File(h5_path, 'w') as hf:
+                hf.create_dataset(f'{monitor_name}_spectrum_E_magnitude', data=E)
+                hf.create_dataset(f'frequencies_hz', data=f)
+            
+            output_h5_paths.append(h5_path)
+            
+            print(f"  Resultados do cromossomo salvo em: {os.path.basename(h5_path)}")
+
+            # --- AQUI: Limpeza do arquivo FSP apenas se o processamento for bem-sucedido ---
+            remove_file(fsp_path)
+            remove_file(fsp_path[:-4]+"_p0.log") # Corrigido para .fsp -> _p0.log
+            print(f"  [Limpeza] Arquivos temporários removidos para o cromossomo.")
+
         except Exception as e:
-            print(f"ERRO ao coletar 'spectrum:E' do monitor {monitor_name}: {e}.")
-               
-    with h5py.File(output_h5_path, 'w') as f:
-        for key, value in simulation_spectra_data.items():
-            f.create_dataset(key, data=value)
-        #f.attrs['s_value'] = current_s_value
-    print(f"Espectros salvos em HDF5: {output_h5_path}")
+            print(f"!!! Erro no pós-processamento do arquivo {os.path.basename(fsp_path)}: {e}")
+            # Os arquivos .fsp e .log não serão removidos em caso de erro, permitindo depuração.
+
+    return output_h5_paths
