@@ -4,18 +4,57 @@ import lumapi
 import os
 import h5py
 import numpy as np
-from .file_handler import remove_file
+import time
 
-# ... (prepare_lumerical_job permanece inalterada) ...
+def prepare_lumerical_job(fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path):
+    """
+    Prepara um único arquivo FSP com os parâmetros de um cromossomo e o salva com um nome único.
+    ...
+    """
+    fsp_file_name = f"guide_temp_s{chromosome['s']:.2e}_w{chromosome['w']:.2e}.fsp"
+    fsp_path = os.path.join(os.path.dirname(fsp_base_path), fsp_file_name)
+    
+    # Adicionando uma verificação defensiva para garantir que o arquivo base existe
+    if not os.path.exists(fsp_base_path):
+        raise FileNotFoundError(f"Erro: O arquivo base '{fsp_base_path}' não foi encontrado.")
+
+    # 1. Carrega o arquivo FSP base
+    fdtd.load(fsp_base_path)
+    fdtd.switchtolayout()
+    # 2. Executa o script LSF para criar a geometria
+    with open(geometry_lsf_path, 'r') as f:
+        create_lsf_content = f.read()
+    fdtd.eval(create_lsf_content)
+
+    # 3. Define os parâmetros do cromossomo na geometria
+    fdtd.setnamed("Guia Metamaterial", "s", chromosome['s'])
+    fdtd.setnamed("Guia Metamaterial", "w", chromosome['w'])
+    fdtd.setnamed("Guia Metamaterial", "l", chromosome['l'])
+    fdtd.setnamed("Guia Metamaterial", "height", chromosome['height'])
+
+    # 4. Executa o script LSF para adicionar os elementos de simulação
+    with open(simulation_lsf_path, 'r') as f:
+        simulate_lsf_content = f.read()
+    fdtd.eval(simulate_lsf_content)
+    
+    # 5. Salva o arquivo FSP modificado com um nome único
+    fdtd.save(fsp_path)
+    
+    return fsp_path
 
 def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geometry_lsf_path,
                                   simulation_lsf_path, simulation_spectra_directory):
     """
     Prepara e executa as simulações para uma geração inteira de cromossomos usando a fila de jobs.
-    Após a execução, lê os resultados de cada arquivo FSP, salva em arquivos .h5 e os deleta.
+    Após a execução, lê os resultados de cada arquivo FSP e os salva em arquivos .h5.
     
     Args:
-        # ... (Parâmetros de entrada) ...
+        fdtd: A instância da sessão Lumerical FDTD.
+        current_population (list): Uma lista de dicionários, onde cada um representa um cromossomo.
+        fsp_base_path: O caminho base para o arquivo FSP temporário.
+        geometry_lsf_path: O caminho para o script LSF que cria a geometria.
+        simulation_lsf_path: O caminho para o script LSF que adiciona os elementos de simulação.
+        simulation_spectra_directory: O diretório onde os arquivos de saída .h5 serão salvos.
         
     Returns:
         Uma lista completa dos caminhos para os arquivos de saída .h5.
@@ -34,6 +73,11 @@ def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geome
     
     print("\n  [Job Manager] Executando todos os jobs na fila. Isso pode levar um tempo...")
     fdtd.runjobs()
+
+    # Adicionando uma pequena pausa para garantir que os arquivos sejam liberados
+    # Isso ajuda a evitar problemas de acesso ao arquivo após o término do job.
+    time.sleep(2) 
+    
     print("  [Job Manager] Todos os jobs da geração foram concluídos. Lendo e salvando os resultados...")
 
     # --- Pós-processamento e salvamento em disco no Python ---
@@ -41,21 +85,22 @@ def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geome
     monitor_name = 'in'
     for fsp_path in fsp_paths_for_gen:
         try:
-            # Carrega o arquivo FSP já simulado para extrair os dados
+            # 1. Carrega o arquivo FSP já simulado para extrair os dados
             fdtd.load(fsp_path)
             
-            # Extrai os dados do monitor 'in'
+            # 2. Extrai os dados do monitor 'in'
             Ex_complex = fdtd.getdata(f"{monitor_name}","Ex")
             Ey_complex = fdtd.getdata(f"{monitor_name}","Ey")
             Ez_complex = fdtd.getdata(f"{monitor_name}","Ez")
 
+            # 3. Calcula a magnitude do vetor campo elétrico
             E = np.sqrt(np.abs(Ex_complex[0,0,0,:])**2 
                                            + np.abs(Ey_complex[0,0,0,:])**2 
                                            + np.abs(Ez_complex[0,0,0,:])**2)
 
             f = fdtd.getdata("in","f")
             
-            # Define o nome do arquivo H5 com base nos parâmetros do cromossomo
+            # 4. Define o nome do arquivo H5 com base nos parâmetros do cromossomo
             s_val = fdtd.getnamed("Guia Metamaterial", "s")
             w_val = fdtd.getnamed("Guia Metamaterial", "w")
             l_val = fdtd.getnamed("Guia Metamaterial", "l")
@@ -64,7 +109,7 @@ def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geome
             h5_file_name = f"spectrum_s{s_val:.2e}_w{w_val:.2e}_l{l_val:.2e}_h{height_val:.2e}.h5"
             h5_path = os.path.join(simulation_spectra_directory, h5_file_name)
             
-            # Salva os dados no arquivo H5 usando a biblioteca h5py
+            # 5. Salva os dados no arquivo H5 usando a biblioteca h5py
             with h5py.File(h5_path, 'w') as hf:
                 hf.create_dataset(f'{monitor_name}_spectrum_E_magnitude', data=E)
                 hf.create_dataset(f'frequencies_hz', data=f)
@@ -73,13 +118,9 @@ def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geome
             
             print(f"  Resultados do cromossomo salvo em: {os.path.basename(h5_path)}")
 
-            # --- AQUI: Limpeza do arquivo FSP apenas se o processamento for bem-sucedido ---
-            remove_file(fsp_path)
-            remove_file(fsp_path[:-4]+"_p0.log") # Corrigido para .fsp -> _p0.log
-            print(f"  [Limpeza] Arquivos temporários removidos para o cromossomo.")
-
         except Exception as e:
             print(f"!!! Erro no pós-processamento do arquivo {os.path.basename(fsp_path)}: {e}")
-            # Os arquivos .fsp e .log não serão removidos em caso de erro, permitindo depuração.
-
+            
+    # Nota: A limpeza dos arquivos .fsp temporários não ocorre aqui.
+    # Essa tarefa é agora responsabilidade do main.py, após o retorno desta função.
     return output_h5_paths

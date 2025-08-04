@@ -3,8 +3,7 @@
 import sys
 import os
 import datetime
-import threading
-import signal
+import time
 import shutil
 
 import numpy as np
@@ -23,12 +22,17 @@ from utils.post_processing import calculate_delta_amp
 from utils.file_handler import clean_simulation_directory
 
 # --- Configurações Globais ---
-_project_directory = "C:\\Users\\USUARIO\\OneDrive\\Lumerical\\metamaterial_guide_otimization"
+_project_directory = "C:\\Users\\lucas\\OneDrive\\Lumerical\\metamaterial_guide_otimization"
 _original_fsp_file_name = "guide.fsp"
 _geometry_lsf_script_name = "create_guide_fdtd.lsf"
 _simulation_lsf_script_name = "run_simu_guide_fdtd.lsf"
 _simulation_spectra_directory_name = "simulation_spectra"
 
+# --- Novo: Diretório para arquivos temporários geracionais ---
+_temp_directory = os.path.join(_project_directory, "temp")
+os.makedirs(_temp_directory, exist_ok=True)
+
+# --- Caminho do arquivo FSP base (permanente para o run do script) ---
 _temp_fsp_base_path = os.path.join(_project_directory, "guide_temp_base.fsp")
 
 _original_fsp_path = os.path.join(_project_directory, _original_fsp_file_name)
@@ -36,15 +40,13 @@ _geometry_lsf_script_path = os.path.join(_project_directory, "resources", _geome
 _simulation_lsf_script_path = os.path.join(_project_directory, "resources", _simulation_lsf_script_name)
 _simulation_spectra_directory = os.path.join(_project_directory, _simulation_spectra_directory_name)
 
-# --- Prepara arquivo FSP temporário que será usado como base para os jobs ---
-# O arquivo base agora é copiado e os jobs individuais são criados a partir dele
-shutil.copy(_original_fsp_path, _temp_fsp_base_path)
-print(f"Copiado {_original_fsp_path} para {_temp_fsp_base_path}")
+# Garante que o diretório para os espectros exista
+os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 6
+population_size = 12
 mutation_rate = 0.2
-num_generations = 10 
+num_generations = 10
 
 # --- Ranges de Parâmetros ---
 s_range = (0.1e-6, 0.25e-6)
@@ -65,12 +67,20 @@ print("-------------------------------------------------------------------------
 print("--------------------------------------------------------------------------")
 
 # --- Prepara arquivo FSP temporário que será usado como base para os jobs ---
-# O arquivo base agora é copiado e os jobs individuais são criados a partir dele
+# Copia o arquivo base uma única vez para o diretório principal (não o 'temp')
 shutil.copy(_original_fsp_path, _temp_fsp_base_path)
 print(f"Copiado {_original_fsp_path} para {_temp_fsp_base_path}")
 
+# Pausa para garantir que o arquivo seja gravado no disco
+#time.sleep(1)
+
+if not os.path.exists(_temp_fsp_base_path):
+    raise FileNotFoundError(f"Erro: O arquivo base {_temp_fsp_base_path} não foi criado. Verifique as permissões ou o caminho.")
+
 # Garante que o diretório para os espectros exista
-os.makedirs(_simulation_spectra_directory, exist_ok=True)
+
+if not os.path.exists(_temp_fsp_base_path):
+    raise FileNotFoundError(f"Erro: O arquivo base {_temp_fsp_base_path} não foi criado. Verifique as permissões ou o caminho.")
 
 # Instancia o otimizador genético
 optimizer = GeneticOptimizer(
@@ -93,8 +103,11 @@ try:
             
             print(f"\n--- Processando Geração {gen_num + 1}/{num_generations} ---")
             
-            # --- Limpa e Simula a Geração ---
-            clean_simulation_directory(_simulation_spectra_directory)
+            # --- Limpeza dos arquivos temporários da geração ANTERIOR ---
+            # O diretório 'temp' agora é usado apenas para os arquivos de simulação temporários
+            clean_simulation_directory(_simulation_spectra_directory, file_extension=".h5")
+            clean_simulation_directory(_temp_directory, file_extension=".fsp")
+            clean_simulation_directory(_temp_directory, file_extension=".log")
             
             # A chamada para a nova função é simples e retorna os resultados
             h5_paths_for_gen = simulate_generation_lumerical(
@@ -159,6 +172,10 @@ try:
         s_range, w_range, l_range, height_range,
         generations_processed
     )
+    # --- Limpeza final após o término da otimização ---
+    if os.path.exists(_temp_fsp_base_path):
+        os.remove(_temp_fsp_base_path)
+        print(f"\n[Limpeza Final] Arquivo base removido: {_temp_fsp_base_path}")
 
 except Exception as e:
     print(f"!!! Erro fatal no script principal de otimização: {e}")
