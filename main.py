@@ -31,7 +31,7 @@ _simulation_spectra_directory_name = "simulation_spectra"
 # --- Novo: Diretório para arquivos temporários geracionais ---
 _temp_directory = os.path.join(_project_directory, "temp")
 os.makedirs(_temp_directory, exist_ok=True)
-
+print(f"_temp_directory = " + _temp_directory)
 # --- Caminho do arquivo FSP base (permanente para o run do script) ---
 _temp_fsp_base_path = os.path.join(_project_directory, "guide_temp_base.fsp")
 
@@ -44,7 +44,7 @@ _simulation_spectra_directory = os.path.join(_project_directory, _simulation_spe
 os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 12
+population_size = 24
 mutation_rate = 0.2
 num_generations = 10
 
@@ -116,7 +116,8 @@ try:
                 _temp_fsp_base_path,
                 _geometry_lsf_script_path,
                 _simulation_lsf_script_path,
-                _simulation_spectra_directory
+                _simulation_spectra_directory,
+                _temp_directory
             )
             
             # --- Pós-Processamento dos Resultados ---

@@ -6,14 +6,26 @@ import h5py
 import numpy as np
 import time
 
-def prepare_lumerical_job(fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path):
+def prepare_lumerical_job(fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path,temp_directory):
     """
     Prepara um único arquivo FSP com os parâmetros de um cromossomo e o salva com um nome único.
-    ...
-    """
-    fsp_file_name = f"guide_temp_s{chromosome['s']:.2e}_w{chromosome['w']:.2e}.fsp"
-    fsp_path = os.path.join(os.path.dirname(fsp_base_path), fsp_file_name)
     
+    Args:
+        fdtd: A instância da sessão Lumerical FDTD.
+        chromosome (dict): Um dicionário contendo os parâmetros do cromossomo.
+        fsp_base_path: O caminho base para o arquivo FSP temporário.
+        geometry_lsf_path: O caminho para o script LSF que cria a geometria.
+        simulation_lsf_path: O caminho para o script LSF que adiciona os elementos de simulação.
+        
+    Returns:
+        O caminho completo para o arquivo FSP salvo.
+    """
+    # Cria um nome de arquivo FSP único para o cromossomo
+    fsp_file_name = f"guide_temp_s{chromosome['s']:.2e}_w{chromosome['w']:.2e}.fsp"
+    # O arquivo temporário é salvo no mesmo diretório do arquivo base, ou em um diretório temporário.
+    print(f"temp_directory = " + temp_directory)
+    fsp_path = os.path.join(temp_directory, fsp_file_name)
+    print(f"fsp_path = " + fsp_path)
     # Adicionando uma verificação defensiva para garantir que o arquivo base existe
     if not os.path.exists(fsp_base_path):
         raise FileNotFoundError(f"Erro: O arquivo base '{fsp_base_path}' não foi encontrado.")
@@ -21,6 +33,7 @@ def prepare_lumerical_job(fdtd, chromosome, fsp_base_path, geometry_lsf_path, si
     # 1. Carrega o arquivo FSP base
     fdtd.load(fsp_base_path)
     fdtd.switchtolayout()
+
     # 2. Executa o script LSF para criar a geometria
     with open(geometry_lsf_path, 'r') as f:
         create_lsf_content = f.read()
@@ -43,7 +56,7 @@ def prepare_lumerical_job(fdtd, chromosome, fsp_base_path, geometry_lsf_path, si
     return fsp_path
 
 def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geometry_lsf_path,
-                                  simulation_lsf_path, simulation_spectra_directory):
+                                  simulation_lsf_path, simulation_spectra_directory,temp_directory):
     """
     Prepara e executa as simulações para uma geração inteira de cromossomos usando a fila de jobs.
     Após a execução, lê os resultados de cada arquivo FSP e os salva em arquivos .h5.
@@ -64,7 +77,7 @@ def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geome
     
     for chromosome in current_population:
         fsp_path = prepare_lumerical_job(
-            fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path
+            fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path,temp_directory
         )
         fsp_paths_for_gen.append(fsp_path)
         
@@ -75,7 +88,6 @@ def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geome
     fdtd.runjobs()
 
     # Adicionando uma pequena pausa para garantir que os arquivos sejam liberados
-    # Isso ajuda a evitar problemas de acesso ao arquivo após o término do job.
     time.sleep(2) 
     
     print("  [Job Manager] Todos os jobs da geração foram concluídos. Lendo e salvando os resultados...")
@@ -121,6 +133,4 @@ def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geome
         except Exception as e:
             print(f"!!! Erro no pós-processamento do arquivo {os.path.basename(fsp_path)}: {e}")
             
-    # Nota: A limpeza dos arquivos .fsp temporários não ocorre aqui.
-    # Essa tarefa é agora responsabilidade do main.py, após o retorno desta função.
     return output_h5_paths
