@@ -20,9 +20,10 @@ from utils.experiment_end import record_experiment_results
 from utils.lumerical_workflow import simulate_generation_lumerical
 from utils.post_processing import calculate_delta_amp
 from utils.file_handler import clean_simulation_directory
+from utils.calculate_spectrum import calculate_generation_spectra
 
 # --- Configurações Globais ---
-_project_directory = "C:\\Users\\lucas\\OneDrive\\Lumerical\\metamaterial_guide_otimization"
+_project_directory = "C:\\Users\\USUARIO\\OneDrive\\Lumerical\\metamaterial_guide_otimization"
 _original_fsp_file_name = "guide.fsp"
 _geometry_lsf_script_name = "create_guide_fdtd.lsf"
 _simulation_lsf_script_name = "run_simu_guide_fdtd.lsf"
@@ -44,9 +45,9 @@ _simulation_spectra_directory = os.path.join(_project_directory, _simulation_spe
 os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 24
+population_size = 3
 mutation_rate = 0.2
-num_generations = 10
+num_generations = 1
 
 # --- Ranges de Parâmetros ---
 s_range = (0.1e-6, 0.25e-6)
@@ -55,7 +56,7 @@ l_range = (0.1e-6, 0.25e-6)
 height_range = (0.15e-6, 0.3e-6)
 
 # --- Critério de Convergência ---
-enable_convergence_check = True
+enable_convergence_check = False
 convergence_threshold_percent = 5.0 # 5% de melhoria ou menos entre gerações
 
 print("--------------------------------------------------------------------------")
@@ -110,7 +111,7 @@ try:
             clean_simulation_directory(_temp_directory, file_extension=".log")
             
             # A chamada para a nova função é simples e retorna os resultados
-            h5_paths_for_gen = simulate_generation_lumerical(
+            S_matrixes_for_generation, in_port_spectrum = simulate_generation_lumerical(
                 fdtd,
                 current_population,
                 _temp_fsp_base_path,
@@ -122,16 +123,17 @@ try:
             
             # --- Pós-Processamento dos Resultados ---
             print("\n  [Job Manager] Pós-processando os resultados da geração...")
+            generation_spectra = calculate_generation_spectra(S_matrixes_for_generation,current_population)
             delta_amp_results_for_gen = []
 
-            for h5_path in h5_paths_for_gen:
-                try:
-                    delta_amp = calculate_delta_amp(h5_path)
-                except Exception as e:
-                    print(f"!!! Erro no pós-processamento do arquivo {os.path.basename(h5_path)}: {e}")
-                    delta_amp = -float('inf')
+            # for h5_path in h5_paths_for_gen:
+            #     try:
+            #         delta_amp = calculate_delta_amp(h5_path)
+            #     except Exception as e:
+            #         print(f"!!! Erro no pós-processamento do arquivo {os.path.basename(h5_path)}: {e}")
+            #         delta_amp = -float('inf')
                     
-                delta_amp_results_for_gen.append(delta_amp)
+            #     delta_amp_results_for_gen.append(delta_amp)
 
             # --- Evoluindo a população com base nos resultados ---
             try:

@@ -5,16 +5,37 @@ clc;
 clear;
 
 #########################################################################################################
-total_length = 40e-6;
 
+total_length = 40e-6;
+# Cria o grupo do Guia
+addstructuregroup;
+set("name","Guia Metamaterial");
+set("x", 0);
+set("y", 0);
+set("z", 0);
+adduserprop("total_length", 2, total_length); # Pode ser um valor inicial ou 0 se calculado
+adduserprop("index", 0, 3.5);
+adduserprop("material", 5, 'Si (Silicon) - Palik');
+adduserprop("height", 2, 0.22e-6);
+adduserprop("w", 2, 0.78e-6);
+adduserprop("l", 2, 0.45e-6);
+adduserprop("s", 2, 0.15e-6);
+
+height = getnamed("Guia Metamaterial", "height");
+w = getnamed("Guia Metamaterial", "w");
+l = getnamed("Guia Metamaterial", "l");
+s = getnamed("Guia Metamaterial", "s");
+
+
+delta = l + s;
 # Cria substrato
 addrect;
 set("material", 'SiO2 (Glass) - Palik');
 set("name","Substrato - SiO2");
 set("x",0);
-set("x span", total_length*1.2);
+set("x span", delta*3);
 set("y", 0);
-set("y span", 10e-6);
+set("y span", w*3);
 set("z", -0.22e-6);
 set("z span", 0.22e-6);
 
@@ -23,36 +44,15 @@ addrect;
 set("material", 'Agua_deion');
 set("name","Agua");
 set("x",0);
-set("x span", total_length*1.2);
+set("x span", delta*3);
 set("y", 0);
-set("y span", 10e-6);
+set("y span", w*3);
 set("z", 0);
-set("z span", 0.8e-6);
+set("z span", height*3);
 set("alpha", 0.4);
 
-
-# Cria o grupo do Guia
-addstructuregroup;
-set("name","Guia Metamaterial");
-set("x", 0);
-set("y", 0);
-set("z", 0);
-
-adduserprop("total_length", 2, total_length); # Pode ser um valor inicial ou 0 se calculado
-adduserprop("index", 0, 3.5);
-adduserprop("material", 5, 'Si (Silicon) - Palik');
-adduserprop("base_width", 2, 0.150e-6);
-adduserprop("height", 2, 0.5e-6);
-adduserprop("w", 2, 7.34e-07);
-adduserprop("l", 2, 1.85e-7);
-adduserprop("s", 2, 1.85e-07);
-#adduserprop("last_x", 2, 0); 
-
 #Escreve o script
+select("Guia Metamaterial"); 
 set("construction group", 1);
 string = pwd() + '/resources/metamaterial_guide.lsf';
 set("script", read(string));
-
-#select("Guia Metamaterial"); # Garante que o grupo está selecionado
-#last_x_read = get("last_x");
-#?"Valor de last_x retornado do construtor: " + num2str(last_x_read);

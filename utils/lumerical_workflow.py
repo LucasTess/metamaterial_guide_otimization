@@ -6,7 +6,7 @@ import h5py
 import numpy as np
 import time
 
-def prepare_lumerical_job(fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path,temp_directory):
+def prepare_lumerical_job(fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path,temp_directory,chrom_id):
     """
     Prepara um único arquivo FSP com os parâmetros de um cromossomo e o salva com um nome único.
     
@@ -21,7 +21,7 @@ def prepare_lumerical_job(fdtd, chromosome, fsp_base_path, geometry_lsf_path, si
         O caminho completo para o arquivo FSP salvo.
     """
     # Cria um nome de arquivo FSP único para o cromossomo
-    fsp_file_name = f"guide_temp_s{chromosome['s']:.2e}_w{chromosome['w']:.2e}.fsp"
+    fsp_file_name = f"guide_temp_chrom_id_{chrom_id}.fsp"
     # O arquivo temporário é salvo no mesmo diretório do arquivo base, ou em um diretório temporário.
     print(f"temp_directory = " + temp_directory)
     fsp_path = os.path.join(temp_directory, fsp_file_name)
@@ -52,7 +52,7 @@ def prepare_lumerical_job(fdtd, chromosome, fsp_base_path, geometry_lsf_path, si
     
     # 5. Salva o arquivo FSP modificado com um nome único
     fdtd.save(fsp_path)
-    
+    fdtd.runsweep()
     return fsp_path
 
 def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geometry_lsf_path,
@@ -74,63 +74,50 @@ def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geome
     """
     fsp_paths_for_gen = []
     print(f"Preparando e adicionando {len(current_population)} jobs na fila...")
-    
+    chrom_id = 0
     for chromosome in current_population:
+        chrom_id = chrom_id + 1
+        print(chrom_id)
         fsp_path = prepare_lumerical_job(
-            fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path,temp_directory
+            fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path,
+            temp_directory,chrom_id
         )
         fsp_paths_for_gen.append(fsp_path)
         
         # Adiciona o arquivo FSP com nome único à fila de jobs
-        fdtd.addjob(fsp_path)
+        #fdtd.addjob(fsp_path)
     
     print("\n  [Job Manager] Executando todos os jobs na fila. Isso pode levar um tempo...")
-    fdtd.runjobs()
+    #fdtd.runjobs()
+    #fdtd.runsweep()
 
-    # Adicionando uma pequena pausa para garantir que os arquivos sejam liberados
-    time.sleep(2) 
     
     print("  [Job Manager] Todos os jobs da geração foram concluídos. Lendo e salvando os resultados...")
 
     # --- Pós-processamento e salvamento em disco no Python ---
-    output_h5_paths = []
-    monitor_name = 'in'
+    S_matrixes_for_generation = []
+
     for fsp_path in fsp_paths_for_gen:
         try:
             # 1. Carrega o arquivo FSP já simulado para extrair os dados
             fdtd.load(fsp_path)
-            
-            # 2. Extrai os dados do monitor 'in'
-            Ex_complex = fdtd.getdata(f"{monitor_name}","Ex")
-            Ey_complex = fdtd.getdata(f"{monitor_name}","Ey")
-            Ez_complex = fdtd.getdata(f"{monitor_name}","Ez")
+            in_port_spectrum = fdtd.getresult("FDTD::ports::in", "spectrum")
+            S_matrix_dataset = fdtd.getsweepresult("s-parameter sweep","S matrix")
+            S_matrix = S_matrix_dataset['S']
+            S_matrixes_for_generation.append(S_matrix)
+            """
+                Em resumo, a matriz S para um dispositivo de 2 portas é composta por 4 termos: S11, S12, S21 e S22. No seu array, eles se traduzem em:
 
-            # 3. Calcula a magnitude do vetor campo elétrico
-            E = np.sqrt(np.abs(Ex_complex[0,0,0,:])**2 
-                                           + np.abs(Ey_complex[0,0,0,:])**2 
-                                           + np.abs(Ez_complex[0,0,0,:])**2)
+                S11: S_matrix[0, 0, :] (Reflexão no porto 1)
 
-            f = fdtd.getdata("in","f")
-            
-            # 4. Define o nome do arquivo H5 com base nos parâmetros do cromossomo
-            s_val = fdtd.getnamed("Guia Metamaterial", "s")
-            w_val = fdtd.getnamed("Guia Metamaterial", "w")
-            l_val = fdtd.getnamed("Guia Metamaterial", "l")
-            height_val = fdtd.getnamed("Guia Metamaterial", "height")
-            
-            h5_file_name = f"spectrum_s{s_val:.2e}_w{w_val:.2e}_l{l_val:.2e}_h{height_val:.2e}.h5"
-            h5_path = os.path.join(simulation_spectra_directory, h5_file_name)
-            
-            # 5. Salva os dados no arquivo H5 usando a biblioteca h5py
-            with h5py.File(h5_path, 'w') as hf:
-                hf.create_dataset(f'{monitor_name}_spectrum_E_magnitude', data=E)
-                hf.create_dataset(f'frequencies_hz', data=f)
-            
-            output_h5_paths.append(h5_path)
-            
-            print(f"  Resultados do cromossomo salvo em: {os.path.basename(h5_path)}")
+                S12: S_matrix[0, 1, :] (Transmissão do porto 2 para o porto 1)
+
+                S21: S_matrix[1, 0, :] (Transmissão do porto 1 para o porto 2)
+
+                S22: S_matrix[1, 1, :] (Reflexão no porto 2)
+            """
 
         except Exception as e:
             print(f"!!! Erro no pós-processamento do arquivo {os.path.basename(fsp_path)}: {e}")
-            
-    return output_h5_paths
+    print(f" Shape todas Matrizes S: {np.shape(S_matrixes_for_generation)}")        
+    return S_matrixes_for_generation,in_port_spectrum
