@@ -22,7 +22,7 @@ from utils.post_processing import calculate_delta_amp
 from utils.file_handler import clean_simulation_directory
 
 # --- Configurações Globais ---
-_project_directory = "C:\\Users\\lucas\\OneDrive\\Lumerical\\metamaterial_guide_otimization"
+_project_directory = "C:\\Py codes\\metamaterial_guide_otimization"
 _original_fsp_file_name = "guide.fsp"
 _geometry_lsf_script_name = "create_guide_fdtd.lsf"
 _simulation_lsf_script_name = "run_simu_guide_fdtd.lsf"
@@ -46,7 +46,7 @@ os.makedirs(_simulation_spectra_directory, exist_ok=True)
 # --- Configuração do Algoritmo Genético ---
 population_size = 24
 mutation_rate = 0.2
-num_generations = 10
+num_generations = 20
 
 # --- Ranges de Parâmetros ---
 s_range = (0.1e-6, 0.25e-6)
@@ -55,7 +55,7 @@ l_range = (0.1e-6, 0.25e-6)
 height_range = (0.15e-6, 0.3e-6)
 
 # --- Critério de Convergência ---
-enable_convergence_check = True
+enable_convergence_check = False
 convergence_threshold_percent = 5.0 # 5% de melhoria ou menos entre gerações
 
 print("--------------------------------------------------------------------------")
