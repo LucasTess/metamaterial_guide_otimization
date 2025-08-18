@@ -1,4 +1,4 @@
-# utils/experiment_end.py
+# experiment_end.py
 
 import os
 import datetime
@@ -7,60 +7,67 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def record_experiment_results(
-    output_directory, optimizer_instance, experiment_start_time,
+    output_directory, 
+    optimizer_instance, 
+    experiment_start_time,
     s_range, w_range, l_range, height_range,
-    generations_processed # <--- NOVO ARGUMENTO
+    generations_processed
 ):
     """
-    Registra os resultados finais do experimento, incluindo o melhor cromossomo,
-    o histórico de fitness, e informações de configuração.
+    Registra os resultados atuais do experimento em arquivos JSON e PNG.
+    Os nomes dos arquivos são baseados no timestamp de início do experimento,
+    permitindo que sejam sobrescritos durante a execução para salvar o progresso.
     """
-    experiment_end_time = datetime.datetime.now()
-    duration = experiment_end_time - experiment_start_time
+    # --- Gera o nome do arquivo baseado no INÍCIO do experimento ---
+    # Isso garante que o nome seja o mesmo durante toda a execução.
+    timestamp_str = experiment_start_time.strftime('%Y%m%d_%H%M%S')
+    results_path = os.path.join(output_directory, f"experiment_results_{timestamp_str}.json")
+    plot_path = os.path.join(output_directory, f"fitness_history_{timestamp_str}.png")
 
-    results_file_name = f"experiment_results_{experiment_end_time.strftime('%Y%m%d_%H%M%S')}.json"
-    results_path = os.path.join(output_directory, results_file_name)
+    # --- Prepara os dados para o arquivo JSON ---
+    current_time = datetime.datetime.now()
+    duration = current_time - experiment_start_time
 
     results_data = {
         "experiment_start_time": experiment_start_time.isoformat(),
-        "experiment_end_time": experiment_end_time.isoformat(),
-        "total_duration": str(duration),
-        "total_generations_processed": generations_processed, # <--- INCLUÍDO AQUI
+        "last_update": current_time.isoformat(), # Mostra quando foi a última atualização
+        "current_duration": str(duration),
+        "generations_processed": generations_processed,
         "population_size": optimizer_instance.population_size,
         "mutation_rate": optimizer_instance.mutation_rate,
-        "max_generations_set": optimizer_instance.generations, # Geração máxima configurada
-        "best_individual": optimizer_instance.best_individual,
-        "best_fitness": optimizer_instance.best_fitness,
-        "s_range": s_range,
-        "w_range": w_range,
-        "l_range": l_range,
-        "height_range": height_range,
-        "fitness_history": optimizer_instance.fitness_history # Assumindo que o otimizador guarda isso
+        "max_generations_set": optimizer_instance.generations,
+        "best_individual_so_far": optimizer_instance.best_individual,
+        "best_fitness_so_far": optimizer_instance.best_fitness,
+        "parameter_ranges": {
+            "s": s_range,
+            "w": w_range,
+            "l": l_range,
+            "height": height_range
+        },
+        "fitness_history": optimizer_instance.fitness_history
     }
 
+    # --- Salva o arquivo JSON (sobrescrevendo o anterior) ---
     try:
         with open(results_path, 'w') as f:
             json.dump(results_data, f, indent=4)
-        print(f"\nResultados do experimento salvos em: {results_path}")
     except Exception as e:
-        print(f"!!! Erro ao salvar resultados do experimento: {e}")
+        print(f"!!! Erro ao salvar/atualizar resultados do experimento: {e}")
 
-    # Plotar o histórico de fitness
+    # --- Plota e salva o gráfico de fitness (sobrescrevendo o anterior) ---
     if optimizer_instance.fitness_history:
         plt.figure(figsize=(10, 6))
         generations = range(1, len(optimizer_instance.fitness_history) + 1)
         plt.plot(generations, optimizer_instance.fitness_history, marker='o', linestyle='-')
-        plt.title('Histórico do Melhor Fitness por Geração')
+        plt.title(f'Histórico de Fitness (Atualizado em: {current_time.strftime("%H:%M:%S")})')
         plt.xlabel('Geração')
         plt.ylabel('Melhor Delta Amplitude')
         plt.grid(True)
-        plot_file_name = f"fitness_history_{experiment_end_time.strftime('%Y%m%d_%H%M%S')}.png"
-        plot_path = os.path.join(output_directory, plot_file_name)
         try:
             plt.savefig(plot_path)
-            print(f"Gráfico do histórico de fitness salvo em: {plot_path}")
         except Exception as e:
-            print(f"!!! Erro ao salvar gráfico do histórico de fitness: {e}")
-        plt.close() # Fecha a figura para liberar memória
+            print(f"!!! Erro ao salvar/atualizar gráfico de fitness: {e}")
+        finally:
+            plt.close() # Libera memória
     else:
         print("Nenhum histórico de fitness para plotar.")
