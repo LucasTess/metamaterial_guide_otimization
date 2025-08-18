@@ -3,10 +3,10 @@
 import sys
 import os
 import datetime
-import time
 import shutil
-
-import numpy as np
+import pandas as pd
+#import time
+#import numpy as np
 
 _lumapi_module_path = "C:\\Program Files\\Lumerical\\v241\\api\\python"
 
@@ -20,13 +20,14 @@ from utils.experiment_end import record_experiment_results
 from utils.lumerical_workflow import simulate_generation_lumerical
 from utils.post_processing import calculate_delta_amp
 from utils.file_handler import clean_simulation_directory
-
+from utils.analysis import generate_correlation_heatmap
 # --- Configurações Globais ---
-_project_directory = "C:\\Py codes\\metamaterial_guide_otimization"
+_project_directory = "C:\\Users\\User04\\Documents\\metamaterial_guide_otimization"
 _original_fsp_file_name = "guide.fsp"
 _geometry_lsf_script_name = "create_guide_fdtd.lsf"
 _simulation_lsf_script_name = "run_simu_guide_fdtd.lsf"
 _simulation_spectra_directory_name = "simulation_spectra"
+_simulation_results_directory_name = "simulation_results"
 
 # --- Novo: Diretório para arquivos temporários geracionais ---
 _temp_directory = os.path.join(_project_directory, "temp")
@@ -39,14 +40,15 @@ _original_fsp_path = os.path.join(_project_directory, _original_fsp_file_name)
 _geometry_lsf_script_path = os.path.join(_project_directory, "resources", _geometry_lsf_script_name)
 _simulation_lsf_script_path = os.path.join(_project_directory, "resources", _simulation_lsf_script_name)
 _simulation_spectra_directory = os.path.join(_project_directory, _simulation_spectra_directory_name)
+_simulation_results_directory = os.path.join(_project_directory, _simulation_results_directory_name)
 
 # Garante que o diretório para os espectros exista
 os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 24
+population_size = 3
 mutation_rate = 0.2
-num_generations = 20
+num_generations = 2
 
 # --- Ranges de Parâmetros ---
 s_range = (0.1e-6, 0.25e-6)
@@ -91,8 +93,17 @@ optimizer.initialize_population()
 current_population = optimizer.population
 
 experiment_start_time = datetime.datetime.now()
+
+# --- NOVO: Define o caminho do CSV de dados completos UMA VEZ ---
+timestamp_str = experiment_start_time.strftime('%Y%m%d_%H%M%S')
+full_data_csv_path = os.path.join(_simulation_results_directory, f"full_optimization_data_{timestamp_str}.csv")
+realtime_heatmap_path = os.path.join(_simulation_results_directory, f"realtime_correlation_heatmap_{timestamp_str}.png")
+
+# PARAMETROS DE INICIALIZAÇÃO
 previous_best_fitness = -float('inf') 
 generations_processed = 0
+all_individuals_data = []
+
 
 try:
     # --- Loop Principal de Otimização (Gerações) ---
@@ -133,12 +144,37 @@ try:
                     
                 delta_amp_results_for_gen.append(delta_amp)
 
+            # --- Armazena os dados desta geração na lista principal ---
+            for i, chromosome in enumerate(current_population):
+                individual_data = chromosome.copy()
+                individual_data['delta_amp'] = delta_amp_results_for_gen[i]
+                individual_data['generation'] = gen_num + 1
+                all_individuals_data.append(individual_data)
+
             # --- Evoluindo a população com base nos resultados ---
             try:
                 current_population = optimizer.evolve(delta_amp_results_for_gen)
             except ValueError as e:
                 print(f"!!! Erro na evolução da população: {e}")
                 break
+            # --- ATUALIZA O RELATÓRIO AO FINAL DE CADA GERAÇÃO ---
+            print(f"  [Relatório] Atualizando relatório para a Geração {gen_num + 1}...")
+            record_experiment_results(
+                _simulation_results_directory,
+                optimizer,
+                experiment_start_time, # Passa o mesmo timestamp de início a cada vez
+                s_range, w_range, l_range, height_range,
+                generations_processed
+            )
+            # --- NOVO: ATUALIZA O CSV DE DADOS COMPLETOS A CADA GERAÇÃO ---
+            if all_individuals_data:
+                df_all_data = pd.DataFrame(all_individuals_data)
+                df_all_data.to_csv(full_data_csv_path, index=False)
+                print(f"  [Análise] Dados de {len(all_individuals_data)} indivíduos atualizados em: {os.path.basename(full_data_csv_path)}")
+                # Gera o novo heatmap de correlação
+                generate_correlation_heatmap(full_data_csv_path, realtime_heatmap_path)
+                print(f"  [Análise] Heatmap de correlação atualizado e salvo.")
+            # ---------------------------------------------------------------------
 
             # --- LÓGICA DE CONVERGÊNCIA ---
             if enable_convergence_check:
@@ -166,14 +202,10 @@ try:
     else:
         print("Nenhum melhor indivíduo encontrado durante a otimização.")
 
-    record_experiment_results(
-        _simulation_spectra_directory,
-        optimizer,
-        experiment_start_time,
-        s_range, w_range, l_range, height_range,
-        generations_processed
-    )
     # --- Limpeza final após o término da otimização ---
+    clean_simulation_directory(_simulation_spectra_directory, file_extension=".h5")
+    clean_simulation_directory(_temp_directory, file_extension=".fsp")
+    clean_simulation_directory(_temp_directory, file_extension=".log")
     if os.path.exists(_temp_fsp_base_path):
         os.remove(_temp_fsp_base_path)
         print(f"\n[Limpeza Final] Arquivo base removido: {_temp_fsp_base_path}")
