@@ -1,39 +1,37 @@
-# utils/analysis.py
+# analysis.py (Modificado para salvar figuras em vez de exibir)
 
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 
-def generate_correlation_heatmap(csv_file_path, output_png_path):
+def run_full_analysis(csv_file_path):
     """
-    Carrega dados de um CSV, gera um heatmap de correlação e o salva em um arquivo PNG.
-    Esta função foi projetada para ser chamada de forma automatizada.
-    
-    Args:
-        csv_file_path (str): O caminho para o arquivo CSV com os dados da otimização.
-        output_png_path (str): O caminho onde o arquivo PNG do heatmap será salvo.
+    Carrega dados de um CSV, gera um heatmap de correlação e um
+    pairplot, e salva ambos como arquivos PNG no mesmo diretório do CSV.
     """
     try:
-        # Verifica se o arquivo de dados existe
-        if not os.path.exists(csv_file_path):
-            #print(f"  [Análise] Arquivo de dados '{os.path.basename(csv_file_path)}' ainda não criado. Pulando heatmap.")
-            return
-
-        df = pd.read_csv(csv_file_path)
+        # --- PREPARAÇÃO DOS DADOS E NOMES DE ARQUIVO ---
         
-        # Correlação requer pelo menos 2 amostras com alguma variação
-        if len(df) < 2 or df['delta_amp'].nunique() < 2:
-            #print(f"  [Análise] Dados insuficientes para gerar correlação (amostras={len(df)}). Pulando heatmap.")
-            return
-
-        # Filtra resultados inválidos que podem ter vindo de simulações falhas
+        df = pd.read_csv(csv_file_path)
+        print("Dados carregados com sucesso!")
+        print(f"Total de indivíduos analisados: {len(df)}")
+        
         df = df[df['delta_amp'] > -1e30]
         
         params_and_fitness = ['s', 'w', 'l', 'height', 'delta_amp']
-        df_corr = df[params_and_fitness]
+        df_analysis = df[params_and_fitness]
+
+        # Define os caminhos de saída baseados no nome do arquivo de entrada
+        output_directory = os.path.dirname(csv_file_path)
+        base_filename = os.path.splitext(os.path.basename(csv_file_path))[0]
         
-        correlation_matrix = df_corr.corr()
+        heatmap_output_path = os.path.join(output_directory, f"{base_filename}_heatmap.png")
+        pairplot_output_path = os.path.join(output_directory, f"{base_filename}_pairplot.png")
+
+        # --- 1. Heatmap de Correlação (O Resumo) ---
+        print(f"\nGerando Heatmap de Correlação...")
+        correlation_matrix = df_analysis.corr()
         
         plt.figure(figsize=(10, 8))
         sns.heatmap(
@@ -43,18 +41,36 @@ def generate_correlation_heatmap(csv_file_path, output_png_path):
             fmt=".2f",
             linewidths=.5
         )
-        plt.title(f'Heatmap de Correlação (Atualizado na Geração {df["generation"].max()})')
+        plt.title('Matriz de Correlação entre Parâmetros e Fitness (delta_amp)')
         
-        # Salva a figura no caminho especificado
-        plt.savefig(output_png_path)
-        
-        # Fecha a figura para liberar memória e evitar que ela seja exibida na tela
+        # MODIFICADO: Salva a figura e fecha para liberar memória
+        plt.savefig(heatmap_output_path)
         plt.close()
+        print(f"-> Heatmap salvo em: {heatmap_output_path}")
+        
+        # --- 2. Pairplot (A Análise Completa) ---
+        print("\nGerando Pairplot... Isso pode levar alguns segundos.")
+        
+        pair_plot = sns.pairplot(
+            df_analysis,
+            diag_kind='kde' # Mostra uma curva de densidade na diagonal
+        )
+        
+        pair_plot.fig.suptitle('Análise Visual de Pares entre Parâmetros e Fitness', y=1.02)
+        
+        # MODIFICADO: Salva a figura e fecha para liberar memória
+        pair_plot.savefig(pairplot_output_path)
+        plt.close()
+        print(f"-> Pairplot salvo em: {pairplot_output_path}")
 
+    except FileNotFoundError:
+        print(f"Erro: O arquivo '{csv_file_path}' não foi encontrado.")
     except Exception as e:
-        print(f"!!! Erro ao gerar o heatmap de correlação: {e}")
+        print(f"Ocorreu um erro durante a análise: {e}")
 
-# Você pode manter esta parte se quiser rodar a análise completa manualmente
+
 if __name__ == '__main__':
-    print("Este script foi projetado para ser importado como um módulo.")
-    print("Para análise manual, execute uma versão anterior ou crie uma função de chamada aqui.")
+    # ATUALIZE AQUI com o caminho para o seu arquivo CSV que deseja analisar
+    file_to_analyze = "C:\\Users\\User04\\Documents\\metamaterial_guide_otimization\\simulation_results\\full_optimization_data_20250818_192228.csv"
+    
+    run_full_analysis(file_to_analyze)
