@@ -122,65 +122,52 @@ class GeneticOptimizer:
 
 
     def evolve(self, current_generation_delta_amps):
-        if len(current_generation_delta_amps) != len(self.population):
-            raise ValueError("O número de resultados de delta_amp não corresponde ao tamanho da população.")
+            if len(current_generation_delta_amps) != len(self.population):
+                raise ValueError("O número de resultados de delta_amp não corresponde ao tamanho da população.")
 
-        current_generation_best_fitness_local = -float('inf') # <--- NOVO: Melhor fitness desta geração
-        
-        for i, individual in enumerate(self.population):
-            individual_fitness = self.calculate_fitness(current_generation_delta_amps[i])
-            individual['fitness'] = individual_fitness # Atribui o fitness ao indivíduo
+            current_generation_best_individual = None
+            current_generation_best_fitness = -float('inf')
+
+            for i, individual in enumerate(self.population):
+                individual_fitness = self.calculate_fitness(current_generation_delta_amps[i])
+                individual['fitness'] = individual_fitness
+
+                # 1. Encontra o melhor indivíduo da GERAÇÃO ATUAL
+                if individual_fitness > current_generation_best_fitness:
+                    current_generation_best_fitness = individual_fitness
+                    current_generation_best_individual = individual
+
+                # Atualiza o melhor indivíduo GLOBAL, se o atual for melhor
+                if individual_fitness > self.best_fitness:
+                    self.best_fitness = individual_fitness
+                    self.best_individual = {k: individual[k] for k in self.param_ranges.keys()}
+                    self.best_individual['fitness'] = self.best_fitness
+
+            self.fitness_history.append(self.best_fitness) # Usa o melhor fitness GLOBAL
+
+            # 2. IMPLEMENTAÇÃO DO ELITISMO - Garante que o melhor indivíduo global sempre sobreviva.
+            new_population = []
+            if self.best_individual:
+                elite_chromosome = {k: self.best_individual[k] for k in self.param_ranges.keys()}
+                new_population.append(elite_chromosome)
+
+            # Preenche o restante da nova população
+            num_to_generate = self.population_size - len(new_population)
             
-            # Atualiza o melhor fitness desta GERAÇÃO
-            if individual_fitness > current_generation_best_fitness_local:
-                current_generation_best_fitness_local = individual_fitness
+            # A lógica de geração de filhos e mutação (local/global) permanece a mesma
+            for _ in range(num_to_generate):
+                parent1, parent2 = self.select_parents()
+                child = random.choice(self.crossover(parent1, parent2))
+                
+                # Decide se a mutação será local ou global
+                if random.random() < 0.5: # 50% de chance para cada tipo de mutação
+                    child = self.mutate(child, mutation_type='local')
+                else:
+                    child = self.mutate(child, mutation_type='global')
 
-            # Atualiza o MELHOR FITNESS GLOBAL (acumulado ao longo de todas as gerações)
-            if individual_fitness > self.best_fitness:
-                self.best_fitness = individual_fitness
-                # Ao atualizar best_individual, copie apenas os parâmetros, não o fitness temporário
-                self.best_individual = {k: individual[k] for k in self.param_ranges.keys()}
-                # O fitness do best_individual armazenado também deve ser o best_fitness global
-                self.best_individual['fitness'] = self.best_fitness
+                new_population.append(child)
 
+            random.shuffle(new_population)
+            self.population = new_population
 
-        # <--- NOVO: Adiciona o melhor fitness desta geração ao histórico
-        # Isto é importante para a checagem de convergência no main.py,
-        # que compara o melhor fitness da geração atual (que é o last item no history)
-        # com o melhor da geração anterior.
-        self.fitness_history.append(current_generation_best_fitness_local) 
-
-        new_population = []
-        
-        # Elite (o melhor indivíduo global) é mantido
-        if self.best_individual and self.best_fitness > -float('inf'):
-            elite_chromosome = {k: self.best_individual[k] for k in self.param_ranges.keys()}
-            new_population.append(elite_chromosome)
-
-        # Preencher o restante da nova população mantendo a proporção de mutação
-        num_to_generate = self.population_size - len(new_population)
-        
-        # Define a proporção de mutação local/global na nova população
-        # Se você quiser 50% de cada tipo de mutação:
-        num_local_mutations = num_to_generate // 2
-        num_global_mutations = num_to_generate - num_local_mutations # Garante que o total seja num_to_generate
-
-        # Gera filhos com mutação "local" (próximo ao ponto atual)
-        for _ in range(num_local_mutations):
-            parent1, parent2 = self.select_parents()
-            child = random.choice(self.crossover(parent1, parent2)) # Pega um dos filhos aleatoriamente
-            child = self.mutate(child, mutation_type='local')
-            new_population.append(child)
-
-        # Gera filhos com mutação "global" (exploração ampla)
-        for _ in range(num_global_mutations):
-            parent1, parent2 = self.select_parents()
-            child = random.choice(self.crossover(parent1, parent2)) # Pega um dos filhos aleatoriamente
-            child = self.mutate(child, mutation_type='global')
-            new_population.append(child)
-
-        random.shuffle(new_population) # Mistura para evitar vieses de ordem
-        self.population = new_population[:self.population_size] # Garante o tamanho correto da população
-
-        # Retorna a população para a próxima simulação, sem o campo 'fitness'
-        return [{k: chrom[k] for k in self.param_ranges.keys()} for chrom in self.population]
+            return [{k: chrom[k] for k in self.param_ranges.keys()} for chrom in self.population]

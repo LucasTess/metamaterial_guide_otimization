@@ -17,23 +17,25 @@ adduserprop("total_length", 2, total_length); # Pode ser um valor inicial ou 0 s
 adduserprop("index", 0, 3.5);
 adduserprop("material", 5, 'Si (Silicon) - Palik');
 adduserprop("height", 2, 0.22e-6);
-adduserprop("w", 2, 0.78e-6);
-adduserprop("l", 2, 0.45e-6);
-adduserprop("s", 2, 0.15e-6);
+adduserprop("w", 2, 0.5e-6);
+adduserprop("Lambda", 2, 0.3e-6);
+adduserprop("DC", 2, 0.5);
+#adduserprop("l", 2, 0.15e-6);
+#adduserprop("s", 2, 0.15e-6);
 
 height = getnamed("Guia Metamaterial", "height");
 w = getnamed("Guia Metamaterial", "w");
-l = getnamed("Guia Metamaterial", "l");
-s = getnamed("Guia Metamaterial", "s");
+#l = getnamed("Guia Metamaterial", "l");
+#s = getnamed("Guia Metamaterial", "s");
+Lambda = getnamed("Guia Metamaterial", "Lambda");
+DC = getnamed("Guia Metamaterial", "DC");
 
-
-delta = l + s;
 # Cria substrato
 addrect;
 set("material", 'SiO2 (Glass) - Palik');
 set("name","Substrato - SiO2");
 set("x",0);
-set("x span", delta*3);
+set("x span", Lambda*8);
 set("y", 0);
 set("y span", w*3);
 set("z", -0.22e-6);
@@ -44,7 +46,7 @@ addrect;
 set("material", 'Agua_deion');
 set("name","Agua");
 set("x",0);
-set("x span", delta*3);
+set("x span", Lambda*8);
 set("y", 0);
 set("y span", w*3);
 set("z", 0);

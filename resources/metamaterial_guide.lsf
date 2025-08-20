@@ -1,13 +1,22 @@
 # --- Criação do segmento do guia fragmentado ---
 
 addrect;
-set("x", 0);
-set('x span', l);
+set("x", -(Lambda*DC)/2);
+set('x span', Lambda*DC);
 set("y", 0);
 set('y span', w);
 set("z", -0.11e-6 + height/2);
 set('z span', height);
 set("name", "segment_period");
+
+#addrect;
+#set("x", s+l/2);
+#set('x span', l);
+#set("y", 0);
+#set('y span', w);
+#set("z", -0.11e-6 + height/2);
+#set('z span', height);
+#set("name", "segment_period");
 
 selectall;
 set("material",material);

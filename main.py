@@ -19,7 +19,7 @@ from utils.genetic import GeneticOptimizer
 from utils.experiment_end import record_experiment_results
 from utils.lumerical_workflow import simulate_generation_lumerical
 from utils.post_processing import calculate_delta_amp
-from utils.file_handler import clean_simulation_directory
+from utils.file_handler import clean_simulation_directory, delete_directory_contents
 from utils.calculate_spectrum import calculate_generation_spectra
 
 # --- Configurações Globais ---
@@ -45,9 +45,14 @@ _simulation_spectra_directory = os.path.join(_project_directory, _simulation_spe
 os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 3
+population_size = 1
 mutation_rate = 0.2
 num_generations = 1
+
+# --- Critério de Convergência ---
+enable_convergence_check = False
+convergence_threshold_percent = 5.0 # 5% de melhoria ou menos entre gerações
+clean_temp_files_error = False
 
 # --- Ranges de Parâmetros ---
 s_range = (0.1e-6, 0.25e-6)
@@ -55,9 +60,6 @@ w_range = (0.3e-6, 0.7e-6)
 l_range = (0.1e-6, 0.25e-6)
 height_range = (0.15e-6, 0.3e-6)
 
-# --- Critério de Convergência ---
-enable_convergence_check = False
-convergence_threshold_percent = 5.0 # 5% de melhoria ou menos entre gerações
 
 print("--------------------------------------------------------------------------")
 print("--------------------------------------------------------------------------")
@@ -106,12 +108,11 @@ try:
             
             # --- Limpeza dos arquivos temporários da geração ANTERIOR ---
             # O diretório 'temp' agora é usado apenas para os arquivos de simulação temporários
-            clean_simulation_directory(_simulation_spectra_directory, file_extension=".h5")
-            clean_simulation_directory(_temp_directory, file_extension=".fsp")
-            clean_simulation_directory(_temp_directory, file_extension=".log")
-            
+            #clean_simulation_directory(_simulation_spectra_directory, file_extension=".h5")
+
+            delete_directory_contents(_temp_directory)
             # A chamada para a nova função é simples e retorna os resultados
-            S_matrixes_for_generation, in_port_spectrum = simulate_generation_lumerical(
+            S_matrixes_for_generation, frequencies = simulate_generation_lumerical(
                 fdtd,
                 current_population,
                 _temp_fsp_base_path,
@@ -123,7 +124,11 @@ try:
             
             # --- Pós-Processamento dos Resultados ---
             print("\n  [Job Manager] Pós-processando os resultados da geração...")
-            generation_spectra = calculate_generation_spectra(S_matrixes_for_generation,current_population)
+            generation_spectra = calculate_generation_spectra(
+                S_matrixes_for_generation,
+                current_population,
+                frequencies
+                )
             delta_amp_results_for_gen = []
 
             # for h5_path in h5_paths_for_gen:
@@ -176,11 +181,15 @@ try:
         generations_processed
     )
     # --- Limpeza final após o término da otimização ---
+    if clean_temp_files_error:
+            delete_directory_contents(_temp_directory)
     if os.path.exists(_temp_fsp_base_path):
         os.remove(_temp_fsp_base_path)
         print(f"\n[Limpeza Final] Arquivo base removido: {_temp_fsp_base_path}")
 
 except Exception as e:
+    if clean_temp_files_error:
+            delete_directory_contents(_temp_directory)
     print(f"!!! Erro fatal no script principal de otimização: {e}")
 
 print("\nScript principal (main.py) finalizado.")

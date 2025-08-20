@@ -1,5 +1,4 @@
 # run_simu_guide_fdtd.lsf
-
 clc;
 
 ##########################################################################################################
@@ -11,9 +10,11 @@ clc;
 
 height = getnamed("Guia Metamaterial", "height");
 w = getnamed("Guia Metamaterial", "w");
-l = getnamed("Guia Metamaterial", "l");
-s = getnamed("Guia Metamaterial", "s");
-total_length = getnamed("Guia Metamaterial", "total_length");
+#l = getnamed("Guia Metamaterial", "l");
+#s = getnamed("Guia Metamaterial", "s");
+Lambda = getnamed("Guia Metamaterial", "Lambda");
+DC = getnamed("Guia Metamaterial", "DC");
+
 # Adicionado para depuração:
 ? "Valores dos parametros lidos em run_simu_guide_fdtd.lsf:";
 ? "s: " + num2str(s);
@@ -23,10 +24,6 @@ total_length = getnamed("Guia Metamaterial", "total_length");
 # Recalculando posição final para os monitores e portas
 delta = l+s;
 
-
-
-
-
 sim_time = 1000e-15;
 points = 500;
 mesh_accuracy = 4;
@@ -34,7 +31,7 @@ addfdtd;
 set("dimension",2);
 set("simulation time", sim_time);
 set("x",0);
-set("x span", delta*3);
+set("x span", Lambda*8);
 set("y",0);
 set("y span",w*3);
 set("z", 0);
@@ -51,20 +48,20 @@ amplitude = 3;
 addport;
 set("name","in");
 setnamed("FDTD::ports::in", "amplitude", amplitude);
-setnamed("FDTD::ports::in", "x", 0-l/2);
+setnamed("FDTD::ports::in", "x", -(Lambda*DC);
 setnamed("FDTD::ports::in", "y",0);
 setnamed("FDTD::ports::in", "y span", w);
-setnamed("FDTD::ports::in", "z",0);
+setnamed("FDTD::ports::in", "z",-0.11e-6 + height/2);
 setnamed("FDTD::ports::in", "z span", height);
 setnamed("FDTD::ports::in", "direction", "Forward");
 
 addport;
 set("name","through");
 setnamed("FDTD::ports::through", "amplitude", amplitude);
-setnamed("FDTD::ports::through", "x", 0-l/2+delta);
+setnamed("FDTD::ports::through", "x", s);
 setnamed("FDTD::ports::through", "y", 0);
 setnamed("FDTD::ports::through", "y span", w);
-setnamed("FDTD::ports::through", "z",0);
+setnamed("FDTD::ports::through", "z",-0.11e-6 + height/2);
 setnamed("FDTD::ports::through", "z span", height);
 setnamed("FDTD::ports::through", "direction", "Backward");
 
@@ -73,55 +70,6 @@ setglobalmonitor("frequency points", points);
 
 
 addsweep(3);
-?setsweep("s-parameter sweep");
+setsweep("s-parameter sweep");
 
 
-
-#addprofile ;
-#set("name","in");
-#set("monitor type",1);
-#set("x", 0-l/2);
-#set("y", 0);
-#set("z", 0);
-
-
-#addprofile ;
-#set("name","through");
-#set("monitor type",1);
-#set("x", last_x);
-#set("y", 0);
-#set("z", 0);
-
-#addmodeexpansion;
-#set("name","in_mode_high");
-#set("x", start+delta);
-#set("y", 0);
-#set("y span", 4*w);
-#set("z",0);
-#set("z span", 4*height);
-
-#addmodeexpansion;
-#set("name","in_mode_low");
-#set("x", start+3*delta/2);
-#set("y", 0);
-#set("y span", 4*w);
-#set("z",0);
-#set("z span", 4*height);
-
-#addmodeexpansion;
-#set("name","through_mode_high");
-#set("x", last_x-delta );
-#set("y", 0);
-#set("y span", 4*w);
-#set("z",0);
-#set("z span", 4*height);
-
-#addmodeexpansion;
-#set("name","through_mode_low");
-#set("x", last_x-3*delta/2 );
-#set("y", 0);
-#set("y span", 4*w);
-#set("z",0);
-#set("z span", 4*height);
-
-#run;

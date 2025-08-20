@@ -1,6 +1,6 @@
 # file_handler.py
 import os
-
+import shutil
 def clean_simulation_directory(directory_path, file_extension=None):
     """
     Limpa todos os arquivos em um diretório com uma extensão específica.
@@ -25,4 +25,30 @@ def clean_simulation_directory(directory_path, file_extension=None):
         except Exception as e:
             print(f"Erro ao remover o arquivo {file_path}: {e}")
 
-# A função remove_file não é mais necessária para o novo fluxo
+def delete_directory_contents(directory_path):
+    """
+    Deleta recursivamente todos os arquivos e pastas dentro de um diretório.
+    O diretório pai (directory_path) é preservado.
+
+    Args:
+        directory_path (str): O caminho do diretório a ser esvaziado.
+    """
+    if not os.path.exists(directory_path):
+        print(f"Aviso: Diretório não encontrado, não é possível limpar: {directory_path}")
+        return
+
+    print(f"Esvaziando o diretório: {directory_path} (todos os arquivos e pastas)...")
+    
+    # Itera sobre todos os arquivos e diretórios dentro do diretório principal
+    for item in os.listdir(directory_path):
+        item_path = os.path.join(directory_path, item)
+        try:
+            # Verifica se o item é um arquivo
+            if os.path.isfile(item_path) or os.path.islink(item_path):
+                os.unlink(item_path)  # Deleta o arquivo
+            # Se for um diretório, usa shutil.rmtree para deletar recursivamente
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+        except Exception as e:
+            print(f'Erro ao deletar {item_path}. Motivo: {e}')
+

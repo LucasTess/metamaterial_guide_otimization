@@ -1,9 +1,9 @@
 {
-    "experiment_start_time": "2025-08-07T20:16:11.788756",
-    "experiment_end_time": "2025-08-07T20:17:43.463011",
-    "total_duration": "0:01:31.674255",
+    "experiment_start_time": "2025-08-11T18:47:31.848504",
+    "experiment_end_time": "2025-08-11T18:51:04.466764",
+    "total_duration": "0:03:32.618260",
     "total_generations_processed": 1,
-    "population_size": 3,
+    "population_size": 1,
     "mutation_rate": 0.2,
     "max_generations_set": 1,
     "best_individual": null,
