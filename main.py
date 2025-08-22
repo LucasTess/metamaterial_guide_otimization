@@ -43,7 +43,7 @@ os.makedirs(_simulation_spectra_directory, exist_ok=True)
 # --- Configuração do Algoritmo Genético ---
 population_size = 30
 mutation_rate = 0.2
-num_generations = 150
+num_generations = 100
 
 # --- Ranges de Parâmetros ---
 s_range = (0.1e-6, 0.25e-6)
@@ -55,7 +55,7 @@ height_range = (0.15e-6, 0.3e-6)
 # ATIVADO: Agora vamos usar a nova lógica
 enable_convergence_check = True
 # Otimização irá parar se o melhor fitness não melhorar por 20 gerações
-CONVERGENCE_PATIENCE = 20
+CONVERGENCE_PATIENCE = num_generations*0.2
 print("--------------------------------------------------------------------------")
 print(f"Iniciando o script principal (main.py) para otimização do guia de onda...")
 print("--------------------------------------------------------------------------")
