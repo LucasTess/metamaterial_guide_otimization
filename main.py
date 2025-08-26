@@ -52,10 +52,8 @@ l_range = (0.1e-6, 0.25e-6)
 height_range = (0.15e-6, 0.3e-6)
 
 # --- Critério de Convergência ---
-# ATIVADO: Agora vamos usar a nova lógica
 enable_convergence_check = True
-# Otimização irá parar se o melhor fitness não melhorar por 20 gerações
-CONVERGENCE_PATIENCE = num_generations*0.2
+CONVERGENCE_PATIENCE = 20
 print("--------------------------------------------------------------------------")
 print(f"Iniciando o script principal (main.py) para otimização do guia de onda...")
 print("--------------------------------------------------------------------------")
