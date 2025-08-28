@@ -10,7 +10,9 @@ def record_experiment_results(
     output_directory, 
     optimizer_instance, 
     experiment_start_time,
-    s_range, w_range, l_range, height_range,
+
+    Lambda_range, DC_range, w_range, height_range,
+
     generations_processed
 ):
     """
@@ -39,9 +41,9 @@ def record_experiment_results(
         "best_individual_so_far": optimizer_instance.best_individual,
         "best_fitness_so_far": optimizer_instance.best_fitness,
         "parameter_ranges": {
-            "s": s_range,
+            "Lambda": Lambda_range,
+            "DC": DC_range,
             "w": w_range,
-            "l": l_range,
             "height": height_range
         },
         "fitness_history": optimizer_instance.fitness_history
@@ -61,7 +63,7 @@ def record_experiment_results(
         plt.plot(generations, optimizer_instance.fitness_history, marker='o', linestyle='-')
         plt.title(f'Histórico de Fitness (Atualizado em: {current_time.strftime("%H:%M:%S")})')
         plt.xlabel('Geração')
-        plt.ylabel('Melhor Delta Amplitude')
+        plt.ylabel('Melhor S11')
         plt.grid(True)
         try:
             plt.savefig(plot_path)
