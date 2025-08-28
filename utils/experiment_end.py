@@ -10,7 +10,9 @@ def record_experiment_results(
     output_directory, 
     optimizer_instance, 
     experiment_start_time,
+
     Lambda_range, DC_range, w_range, height_range,
+
     generations_processed
 ):
     """

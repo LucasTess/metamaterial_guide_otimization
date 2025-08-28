@@ -1,3 +1,4 @@
+
 # main.py 
 import sys
 import os
@@ -40,9 +41,11 @@ _simulation_results_directory = os.path.join(_project_directory, _simulation_res
 os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 3
+
+population_size = 30
 mutation_rate = 0.2
-num_generations = 2
+num_generations = 100
+
 
 # --- Ranges de Parâmetros ---
 Lambda_range = (0.1e-6, 0.6e-6)
@@ -173,7 +176,6 @@ try:
         print(f"Melhor Fitness (S11 Médio) atingido: {optimizer.best_fitness:.4e}")
     else:
         print("Nenhum melhor indivíduo encontrado durante a otimização.")
-
 except Exception as e:
     print(f"!!! Erro fatal no script principal de otimização: {e}")
 

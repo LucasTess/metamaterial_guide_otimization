@@ -10,8 +10,7 @@ Lambda = getnamed("Guia Metamaterial", "Lambda");
 
 sim_time = 1000e-15;
 points = 500;
-mesh_accuracy = 4;
-
+mesh_accuracy = 2;
 addfdtd;
 # MUDANCA 1: A simulacao DEVE ser 3D para um guia SWG.
 set("dimension", "3D");

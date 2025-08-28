@@ -121,8 +121,10 @@ class GeneticOptimizer:
         return chromosome
 
 
+
     def evolve(self, current_generation_fitness):
             if len(current_generation_fitness) != len(self.population):
+
                 raise ValueError("O número de resultados de delta_amp não corresponde ao tamanho da população.")
 
             current_generation_best_individual = None

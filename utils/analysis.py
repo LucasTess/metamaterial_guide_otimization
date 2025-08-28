@@ -17,9 +17,10 @@ def run_full_analysis(csv_file_path):
         print("Dados carregados com sucesso!")
         print(f"Total de indivíduos analisados: {len(df)}")
         
+
         df = df[df['S11'] > -1e30]
         
-        params_and_fitness = ['Lambda', 'DC', 'w', 'height', 'S11']
+
         df_analysis = df[params_and_fitness]
 
         # Define os caminhos de saída baseados no nome do arquivo de entrada
@@ -56,7 +57,9 @@ def run_full_analysis(csv_file_path):
             diag_kind='kde' # Mostra uma curva de densidade na diagonal
         )
         
+
         pair_plot.figure.suptitle('Análise Visual de Pares entre Parâmetros e Fitness', y=1.02)
+
         
         # MODIFICADO: Salva a figura e fecha para liberar memória
         pair_plot.savefig(pairplot_output_path)
