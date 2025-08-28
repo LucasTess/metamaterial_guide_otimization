@@ -16,11 +16,8 @@ def run_full_analysis(csv_file_path):
         df = pd.read_csv(csv_file_path)
         print("Dados carregados com sucesso!")
         print(f"Total de indivíduos analisados: {len(df)}")
-        
-
         df = df[df['S11'] > -1e30]
-        
-
+        params_and_fitness = ['Lambda', 'DC', 'w', 'height', 'S11']
         df_analysis = df[params_and_fitness]
 
         # Define os caminhos de saída baseados no nome do arquivo de entrada

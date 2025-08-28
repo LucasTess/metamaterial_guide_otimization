@@ -42,10 +42,9 @@ os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
 
-population_size = 30
+population_size = 3
 mutation_rate = 0.2
-num_generations = 100
-
+num_generations = 2
 
 # --- Ranges de Parâmetros ---
 Lambda_range = (0.1e-6, 0.6e-6)
@@ -126,8 +125,6 @@ try:
             individual_data['S11'] = S11_for_gen[i]
             individual_data['generation'] = gen_num + 1
             all_individuals_data.append(individual_data)
-
-
 
         try:
             current_population = optimizer.evolve(S11_for_gen)
