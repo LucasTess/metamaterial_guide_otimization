@@ -1,42 +1,39 @@
-# run_simu_guide_fdtd.lsf
+# run_simu_guide_fdtd_CORRIGIDO.lsf
 clc;
 
 ##########################################################################################################
-# Define os parametros de simulacao
-
-# === LEIA OS PARAMETROS DAS USER PROPERTIES AQUI ===
-# Acessa as propriedades do grupo "Guia Metamaterial" diretamente pelo nome completo.
-# Esta eh a forma mais robusta de acessar as user properties de um objeto nomeado.
+# Define os parametros de simulacao para Matriz S de uma CELULA UNITARIA
 
 height = getnamed("Guia Metamaterial", "height");
 w = getnamed("Guia Metamaterial", "w");
-#l = getnamed("Guia Metamaterial", "l");
-#s = getnamed("Guia Metamaterial", "s");
 Lambda = getnamed("Guia Metamaterial", "Lambda");
-DC = getnamed("Guia Metamaterial", "DC");
-
-# Adicionado para depuração:
-? "Valores dos parametros lidos em run_simu_guide_fdtd.lsf:";
-? "s: " + num2str(s);
-? "w: " + num2str(w);
-? "l: " + num2str(l);
-? "Height: " + num2str(height);
-# Recalculando posição final para os monitores e portas
-delta = l+s;
 
 sim_time = 1000e-15;
 points = 500;
 mesh_accuracy = 4;
+
 addfdtd;
-set("dimension",2);
+# MUDANCA 1: A simulacao DEVE ser 3D para um guia SWG.
+set("dimension", "3D");
 set("simulation time", sim_time);
-set("x",0);
-set("x span", Lambda*8);
-set("y",0);
-set("y span",w*3);
+
+# MUDANCA 2: A regiao de simulacao deve ter o tamanho de UM PERIODO em x.
+set("x", 0);
+set("x span", Lambda); 
+set("y", 0);
+set("y span", w*4); # Um pouco mais de espaco para o campo decair
 set("z", 0);
-set("z span", height*3);
+set("z span", height*6); # Um pouco mais de espaco para o campo decair
 set("background material", 'Agua_deion');
+
+# MUDANCA 3 (A MAIS IMPORTANTE): Usar condicoes de contorno de BLOCH em X.
+# Isso força o solver e as portas a encontrarem o modo periodico (modo de Bloch).
+set("x min bc", "Bloch");
+set("x max bc", "Bloch");
+set("y min bc", "PML");
+set("y max bc", "PML");
+set("z min bc", "PML");
+set("z max bc", "PML");
 
 set("mesh accuracy", mesh_accuracy);
 
@@ -44,32 +41,43 @@ setglobalsource("wavelength start", 1.45e-6);
 setglobalsource("wavelength stop", 1.62e-6);
 setglobalsource("optimize for short pulse", 0);
 
-amplitude = 3;
-addport;
-set("name","in");
-setnamed("FDTD::ports::in", "amplitude", amplitude);
-setnamed("FDTD::ports::in", "x", -(Lambda*DC);
-setnamed("FDTD::ports::in", "y",0);
-setnamed("FDTD::ports::in", "y span", w);
-setnamed("FDTD::ports::in", "z",-0.11e-6 + height/2);
-setnamed("FDTD::ports::in", "z span", height);
-setnamed("FDTD::ports::in", "direction", "Forward");
+# --- CONFIGURACAO DAS PORTAS (AGORA COMO PORTAS DE BLOCH) ---
 
+# Porta de Entrada
 addport;
-set("name","through");
-setnamed("FDTD::ports::through", "amplitude", amplitude);
-setnamed("FDTD::ports::through", "x", s);
-setnamed("FDTD::ports::through", "y", 0);
-setnamed("FDTD::ports::through", "y span", w);
-setnamed("FDTD::ports::through", "z",-0.11e-6 + height/2);
-setnamed("FDTD::ports::through", "z span", height);
-setnamed("FDTD::ports::through", "direction", "Backward");
+set("name", "in");
+# MUDANCA 4: Posicionar as portas EXATAMENTE nas fronteiras da simulacao.
+# A fronteira de Bloch conecta as duas, fazendo com que elas funcionem corretamente.
+set("x", -Lambda/2);
+set("y", 0);
+set("y span", w*3.5);
+set("z", -0.11e-6 + height/2);
+set("z span", height*3);
+set("direction", "Forward");
+
+# Porta de Saida
+addport;
+set("name", "through");
+set("x", Lambda/2);
+set("y", 0);
+set("y span", w*3.5);
+set("z", -0.11e-6 + height/2);
+set("z span", height*3);
+# A direcao da porta 2 nao importa muito para o calculo da Matriz S, mas a deixamos como Forward
+set("direction", "Forward");
 
 setnamed("FDTD::ports", "monitor frequency points", points);
 setglobalmonitor("frequency points", points);
 
+# Este monitor de perfil de campo continua util para visualizacao
+#addpower;
+#set("name", "field_profile");
+#set("monitor type", "2D z-normal"); # 2D z-normal
+#set("x", 0);
+#set("x span", Lambda);
+#set("y", 0);
+#set("y span", w*3.5);
+#set("z", -0.11e-6 + height/2);
 
-addsweep(3);
+addsweep(3); 
 setsweep("s-parameter sweep");
-
-

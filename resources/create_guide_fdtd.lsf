@@ -19,14 +19,10 @@ adduserprop("material", 5, 'Si (Silicon) - Palik');
 adduserprop("height", 2, 0.22e-6);
 adduserprop("w", 2, 0.5e-6);
 adduserprop("Lambda", 2, 0.3e-6);
-adduserprop("DC", 2, 0.5);
-#adduserprop("l", 2, 0.15e-6);
-#adduserprop("s", 2, 0.15e-6);
+adduserprop("DC", 2, 0.7);
 
 height = getnamed("Guia Metamaterial", "height");
 w = getnamed("Guia Metamaterial", "w");
-#l = getnamed("Guia Metamaterial", "l");
-#s = getnamed("Guia Metamaterial", "s");
 Lambda = getnamed("Guia Metamaterial", "Lambda");
 DC = getnamed("Guia Metamaterial", "DC");
 

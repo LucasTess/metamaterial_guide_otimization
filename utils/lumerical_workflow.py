@@ -40,9 +40,9 @@ def simulate_and_get_s_matrix(fdtd, chromosome, fsp_base_path, geometry_lsf_path
         fdtd.eval(create_lsf_content)
 
         # 3. Define os parâmetros do cromossomo
-        fdtd.setnamed("Guia Metamaterial", "s", chromosome['s'])
+        fdtd.setnamed("Guia Metamaterial", "Lambda", chromosome['Lambda'])
+        fdtd.setnamed("Guia Metamaterial", "DC", chromosome['DC'])
         fdtd.setnamed("Guia Metamaterial", "w", chromosome['w'])
-        fdtd.setnamed("Guia Metamaterial", "l", chromosome['l'])
         fdtd.setnamed("Guia Metamaterial", "height", chromosome['height'])
 
         # 4. Executa o script LSF para adicionar os elementos de simulação
@@ -61,8 +61,6 @@ def simulate_and_get_s_matrix(fdtd, chromosome, fsp_base_path, geometry_lsf_path
         # 7. Coleta o dataset completo da varredura
         S_matrix_dataset = fdtd.getsweepresult("s-parameter sweep", "S matrix")
         S_matrix = S_matrix_dataset['S']
-        # Roubadinha para debug
-        S_matrix = S_matrix*10
         frequencies = S_matrix_dataset['f']
         
         return S_matrix, frequencies

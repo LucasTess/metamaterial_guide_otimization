@@ -3,14 +3,14 @@ import numpy as np
 
 class GeneticOptimizer:
     def __init__(self, population_size, mutation_rate, generations, # 'generations' já está ok
-                 s_range, w_range, l_range, height_range):
+                 Lambda_range, DC_range, w_range, height_range):
         self.population_size = population_size
         self.mutation_rate = mutation_rate
         self.generations = generations # Nome da variável para o número máximo de gerações
         self.param_ranges = {
-            's': s_range,
+            'Lambda': Lambda_range,
+            'DC': DC_range,
             'w': w_range,
-            'l': l_range,
             'height': height_range
         }
         self.population = []
@@ -19,15 +19,15 @@ class GeneticOptimizer:
         self.fitness_history = [] # <--- NOVO: Inicializa o histórico de fitness
 
         self.reference_params = {
-            's': 0.15e-6,
-            'w': 0.5e-6,
-            'l': 0.15e-6,
+            'Lambda': 0.15e-6,
+            'DC': 0.5e-6,
+            'w': 0.15e-6,
             'height': 0.22e-6
         }
         self.initial_mutation_amplitude = {
-            's': 0.5 * self.reference_params['s'],
+            'Lambda': 0.5 * self.reference_params['Lambda'],
+            'DC': 0.5 * self.reference_params['DC'],
             'w': 0.5 * self.reference_params['w'],
-            'l': 0.5 * self.reference_params['l'],
             'height': 0.5 * self.reference_params['height']
         }
         # Define a amplitude da mutação "local" como uma porcentagem do range total
@@ -121,15 +121,15 @@ class GeneticOptimizer:
         return chromosome
 
 
-    def evolve(self, current_generation_delta_amps):
-            if len(current_generation_delta_amps) != len(self.population):
+    def evolve(self, current_generation_fitness):
+            if len(current_generation_fitness) != len(self.population):
                 raise ValueError("O número de resultados de delta_amp não corresponde ao tamanho da população.")
 
             current_generation_best_individual = None
             current_generation_best_fitness = -float('inf')
 
             for i, individual in enumerate(self.population):
-                individual_fitness = self.calculate_fitness(current_generation_delta_amps[i])
+                individual_fitness = self.calculate_fitness(current_generation_fitness[i])
                 individual['fitness'] = individual_fitness
 
                 # 1. Encontra o melhor indivíduo da GERAÇÃO ATUAL
