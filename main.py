@@ -42,9 +42,9 @@ os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
 
-population_size = 3
+population_size = 30
 mutation_rate = 0.2
-num_generations = 2
+num_generations = 100
 
 # --- Ranges de Parâmetros ---
 Lambda_range = (0.1e-6, 0.6e-6)
@@ -97,7 +97,7 @@ try:
         delete_directory_contents(_temp_directory)
         
         # --- PASSO 2: Inicia uma NOVA sessão Lumerical para esta geração ---
-        with lumapi.FDTD(hide=False) as fdtd:
+        with lumapi.FDTD(hide=True) as fdtd:
             
             # A chamada para a simulação agora está dentro do seu próprio bloco 'with'
             S_matrixes_for_generation, frequencies = simulate_generation_lumerical(
