@@ -17,7 +17,7 @@ def run_full_analysis(csv_file_path):
         print("Dados carregados com sucesso!")
         print(f"Total de indivíduos analisados: {len(df)}")
         df = df[df['S11'] > -1e30]
-        params_and_fitness = ['Lambda', 'DC', 'w', 'height', 'S11']
+        params_and_fitness = ['Lambda', 'DC', 'w', 'height', 'Fitness']
         df_analysis = df[params_and_fitness]
 
         # Define os caminhos de saída baseados no nome do arquivo de entrada
@@ -39,7 +39,7 @@ def run_full_analysis(csv_file_path):
             fmt=".2f",
             linewidths=.5
         )
-        plt.title('Matriz de Correlação entre Parâmetros e Fitness (delta_amp)')
+        plt.title('Matriz de Correlação entre Parâmetros e Fitness')
         
         # MODIFICADO: Salva a figura e fecha para liberar memória
         plt.savefig(heatmap_output_path)

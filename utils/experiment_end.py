@@ -63,7 +63,7 @@ def record_experiment_results(
         plt.plot(generations, optimizer_instance.fitness_history, marker='o', linestyle='-')
         plt.title(f'Histórico de Fitness (Atualizado em: {current_time.strftime("%H:%M:%S")})')
         plt.xlabel('Geração')
-        plt.ylabel('Melhor S11')
+        plt.ylabel('Melhor Fitness')
         plt.grid(True)
         try:
             plt.savefig(plot_path)

@@ -17,13 +17,15 @@ from utils.genetic import GeneticOptimizer
 from utils.experiment_end import record_experiment_results
 from utils.lumerical_workflow import simulate_generation_lumerical
 from utils.file_handler import delete_directory_contents
-from utils.s_matrix_calculations import calculate_mean_S11_for_generation
+from utils.parameter_extraction import post_process_generation
+from utils.calculate_fitness import calculate_fitness_for_generation
 from utils.analysis import run_full_analysis
 
 # --- Configurações Globais ---
 _project_directory = os.getcwd()
 _original_fsp_file_name = "guide.fsp"
 _geometry_lsf_script_name = "create_guide_fdtd.lsf"
+_reference_lsf_script_name = "create_reference_fdtd.lsf"
 _simulation_lsf_script_name = "run_simu_guide_fdtd.lsf"
 _simulation_spectra_directory_name = "simulation_spectra"
 _simulation_results_directory_name = "simulation_results"
@@ -34,6 +36,7 @@ os.makedirs(_temp_directory, exist_ok=True)
 _temp_fsp_base_path = os.path.join(_project_directory, "guide_temp_base.fsp")
 _original_fsp_path = os.path.join(_project_directory, _original_fsp_file_name)
 _geometry_lsf_script_path = os.path.join(_project_directory, "resources", _geometry_lsf_script_name)
+_reference_lsf_script_path = os.path.join(_project_directory, "resources", _reference_lsf_script_name)
 _simulation_lsf_script_path = os.path.join(_project_directory, "resources", _simulation_lsf_script_name)
 _simulation_spectra_directory = os.path.join(_project_directory, _simulation_spectra_directory_name)
 _simulation_results_directory = os.path.join(_project_directory, _simulation_results_directory_name)
@@ -42,9 +45,9 @@ os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
 
-population_size = 30
+population_size = 12
 mutation_rate = 0.2
-num_generations = 100
+num_generations = 1
 
 # --- Ranges de Parâmetros ---
 Lambda_range = (0.1e-6, 0.6e-6)
@@ -55,6 +58,12 @@ height_range = (0.15e-6, 0.3e-6)
 # --- Critério de Convergência ---
 enable_convergence_check = True
 CONVERGENCE_PATIENCE = 20
+
+# --- Checagem do espectro de reflexão ---
+plot_best_spectrum = True
+
+# --- Ativar limpeza de debug ---
+debug_clean = False
 
 print("--------------------------------------------------------------------------")
 print(f"Iniciando o script principal (main.py) para otimização do guia de onda...")
@@ -97,37 +106,48 @@ try:
         delete_directory_contents(_temp_directory)
         
         # --- PASSO 2: Inicia uma NOVA sessão Lumerical para esta geração ---
-        with lumapi.FDTD(hide=True) as fdtd:
+        with lumapi.FDTD(hide=False) as fdtd:
             
             # A chamada para a simulação agora está dentro do seu próprio bloco 'with'
-            S_matrixes_for_generation, frequencies = simulate_generation_lumerical(
+            S_matrixes_for_generation, S_matrixes_ref_for_generation, frequencies = simulate_generation_lumerical(
                 fdtd,
                 current_population,
                 _temp_fsp_base_path,
                 _geometry_lsf_script_path,
+                _reference_lsf_script_path,
                 _simulation_lsf_script_path,
-                _simulation_spectra_directory,
                 _temp_directory
             )
         # --- A sessão 'fdtd' é AUTOMATICAMENTE fechada aqui, liberando os arquivos ---
         
         # --- Pós-Processamento e Evolução (fora do bloco 'with') ---
         print("\n  [Job Manager] Pós-processando os resultados da geração...")
-        S11_for_gen = calculate_mean_S11_for_generation(
+        total_S_matrices  = post_process_generation(
             S_matrixes_for_generation,
+            S_matrixes_ref_for_generation,
             current_population,
+            frequencies
         )
-        print("S11 médio da geração:", S11_for_gen)
+        gen_fitness = calculate_fitness_for_generation(
+            total_S_matrices,
+            frequencies,
+            plot_best_spectrum,
+            gen_num + 1,
+            _simulation_spectra_directory            
+        )
 
+
+        print("Fitness da geração:", gen_fitness)
+        
 
         for i, chromosome in enumerate(current_population):
             individual_data = chromosome.copy()
-            individual_data['S11'] = S11_for_gen[i]
+            individual_data['Fitness'] = gen_fitness[i]
             individual_data['generation'] = gen_num + 1
             all_individuals_data.append(individual_data)
 
         try:
-            current_population = optimizer.evolve(S11_for_gen)
+            current_population = optimizer.evolve(gen_fitness)
         except ValueError as e:
             print(f"!!! Erro na evolução da população: {e}")
             break
@@ -178,10 +198,11 @@ except Exception as e:
 
 finally:
     # --- Limpeza Final ---
-    print("\nIniciando limpeza final...")
-    delete_directory_contents(_temp_directory)
-    if os.path.exists(_temp_fsp_base_path):
-        os.remove(_temp_fsp_base_path)
-        print(f"[Limpeza Final] Arquivo base removido: {_temp_fsp_base_path}")
+    if debug_clean:
+        print("\nIniciando limpeza final...")
+        delete_directory_contents(_temp_directory)
+        if os.path.exists(_temp_fsp_base_path):
+            os.remove(_temp_fsp_base_path)
+            print(f"[Limpeza Final] Arquivo base removido: {_temp_fsp_base_path}")
 
 print("\nScript principal (main.py) finalizado.")

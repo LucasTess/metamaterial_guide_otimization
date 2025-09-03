@@ -1,4 +1,4 @@
-# run_simu_guide_fdtd_CORRIGIDO.lsf
+# run_simu_guide_fdtd.lsf (AJUSTADO)
 clc;
 
 ##########################################################################################################
@@ -8,25 +8,18 @@ height = getnamed("Guia Metamaterial", "height");
 w = getnamed("Guia Metamaterial", "w");
 Lambda = getnamed("Guia Metamaterial", "Lambda");
 
-sim_time = 1000e-15;
-points = 500;
-mesh_accuracy = 2;
 addfdtd;
-# MUDANCA 1: A simulacao DEVE ser 3D para um guia SWG.
 set("dimension", "3D");
-set("simulation time", sim_time);
-
-# MUDANCA 2: A regiao de simulacao deve ter o tamanho de UM PERIODO em x.
+set("simulation time", 1000e-15);
 set("x", 0);
 set("x span", Lambda); 
 set("y", 0);
-set("y span", w*4); # Um pouco mais de espaco para o campo decair
+set("y span", w*4);
 set("z", 0);
-set("z span", height*6); # Um pouco mais de espaco para o campo decair
+set("z span", height*6);
 set("background material", 'Agua_deion');
 
-# MUDANCA 3 (A MAIS IMPORTANTE): Usar condicoes de contorno de BLOCH em X.
-# Isso força o solver e as portas a encontrarem o modo periodico (modo de Bloch).
+# Condições de Contorno de BLOCH em X
 set("x min bc", "Bloch");
 set("x max bc", "Bloch");
 set("y min bc", "PML");
@@ -34,24 +27,21 @@ set("y max bc", "PML");
 set("z min bc", "PML");
 set("z max bc", "PML");
 
-set("mesh accuracy", mesh_accuracy);
+set("mesh accuracy", 2);
 
 setglobalsource("wavelength start", 1.45e-6);
 setglobalsource("wavelength stop", 1.62e-6);
-setglobalsource("optimize for short pulse", 0);
 
-# --- CONFIGURACAO DAS PORTAS (AGORA COMO PORTAS DE BLOCH) ---
+# --- CONFIGURACAO DAS PORTAS ---
 
 # Porta de Entrada
 addport;
 set("name", "in");
-# MUDANCA 4: Posicionar as portas EXATAMENTE nas fronteiras da simulacao.
-# A fronteira de Bloch conecta as duas, fazendo com que elas funcionem corretamente.
 set("x", -Lambda/2);
 set("y", 0);
-set("y span", w*3.5);
-set("z", -0.11e-6 + height/2);
-set("z span", height*3);
+set("y span", w*2.5);  # AJUSTADO: Span um pouco menor e mais focado
+set("z", 0);
+set("z span", height*3.5); # AJUSTADO: Span um pouco menor e mais focado
 set("direction", "Forward");
 
 # Porta de Saida
@@ -59,24 +49,12 @@ addport;
 set("name", "through");
 set("x", Lambda/2);
 set("y", 0);
-set("y span", w*3.5);
-set("z", -0.11e-6 + height/2);
-set("z span", height*3);
-# A direcao da porta 2 nao importa muito para o calculo da Matriz S, mas a deixamos como Forward
+set("y span", w*2.5);  # AJUSTADO
+set("z", 0);
+set("z span", height*3.5); # AJUSTADO
 set("direction", "Forward");
 
-setnamed("FDTD::ports", "monitor frequency points", points);
-setglobalmonitor("frequency points", points);
+setglobalmonitor("frequency points", 500);
 
-# Este monitor de perfil de campo continua util para visualizacao
-#addpower;
-#set("name", "field_profile");
-#set("monitor type", "2D z-normal"); # 2D z-normal
-#set("x", 0);
-#set("x span", Lambda);
-#set("y", 0);
-#set("y span", w*3.5);
-#set("z", -0.11e-6 + height/2);
-
+# Adiciona e nomeia o objeto de S-parameter sweep
 addsweep(3); 
-setsweep("s-parameter sweep");
