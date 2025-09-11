@@ -21,7 +21,7 @@ from utils.file_handler import clean_simulation_directory
 from utils.analysis import run_full_analysis
 
 # --- Configurações Globais ---
-_project_directory = "C:\\Users\\User04\\Documents\\metamaterial_guide_otimization"
+_project_directory = os.getcwd()
 _original_fsp_file_name = "guide.fsp"
 _geometry_lsf_script_name = "create_guide_fdtd.lsf"
 _simulation_lsf_script_name = "run_simu_guide_fdtd.lsf"
@@ -41,9 +41,9 @@ _simulation_results_directory = os.path.join(_project_directory, _simulation_res
 os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 30
+population_size = 3
 mutation_rate = 0.2
-num_generations = 100
+num_generations = 1
 
 # --- Ranges de Parâmetros ---
 s_range = (0.1e-6, 0.25e-6)
