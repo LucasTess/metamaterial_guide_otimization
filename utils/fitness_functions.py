@@ -119,15 +119,51 @@ class LowpassStrategy(FitnessStrategy):
 
 class HighpassStrategy(FitnessStrategy):
     """
-    [PLACEHOLDER] Estratégia para otimizar um filtro passa-altas.
-    O objetivo será maximizar a transmissão acima de uma frequência de corte.
+    [IMPLEMENTADO] Estratégia para otimizar um filtro passa-altas.
+    O objetivo é maximizar a transmissão acima de uma frequência de corte e
+    minimizar a transmissão abaixo dela.
     """
     def __init__(self, cutoff_freq: float):
         self.cutoff_freq = cutoff_freq
+        if cutoff_freq <= 0:
+            raise ValueError("A frequência de corte (cutoff_freq) deve ser um valor positivo.")
 
     def calculate(self, output_h5_path: str) -> float:
-        # TODO: Implementar a lógica de cálculo para o filtro passa-altas.
-        # A lógica irá recompensar a alta transmissão acima da cutoff_freq
-        # e penalizar a transmissão abaixo dela.
-        # print(f"AVISO: A lógica para HighpassStrategy(cutoff={self.cutoff_freq}) ainda não foi implementada.")
-        return 0.0
+        """
+        Calcula o fitness como: (transmissão média na banda passante) - (transmissão média na banda de rejeição).
+        """
+        try:
+            with h5py.File(output_h5_path, 'r') as f:
+                # 1. Carregar os dados essenciais
+                frequencies = f['frequencies_hz'][:]
+                power_in = f['power_in'][:]
+                power_through = f['power_through'][:]
+
+                # 2. Calcular a Transmitância (T)
+                # Adicionar um valor pequeno (epsilon) para evitar divisão por zero
+                epsilon = 1e-20
+                transmission = np.abs(power_through / (power_in + epsilon))
+
+                # 3. Separar as bandas de interesse usando máscaras booleanas
+                stop_band_mask = frequencies <= self.cutoff_freq
+                pass_band_mask = frequencies > self.cutoff_freq
+                
+                # Verificar se existem pontos de dados em ambas as bandas
+                if not np.any(stop_band_mask) or not np.any(pass_band_mask):
+                    print(f"AVISO: A frequência de corte {self.cutoff_freq/1e12:.2f} THz está fora do range da simulação. O fitness será 0.")
+                    return 0.0
+
+                # 4. Calcular a transmitância média em cada banda
+                avg_transmission_pass_band = np.mean(transmission[pass_band_mask])
+                avg_transmission_stop_band = np.mean(transmission[stop_band_mask])
+
+                # 5. O Fitness é a diferença. Otimizador tentará maximizar este valor.
+                # Um filtro ideal teria avg_transmission_pass_band ~ 1 e avg_transmission_stop_band ~ 0.
+                fitness_score = avg_transmission_pass_band - avg_transmission_stop_band
+                
+                # Garantir que não retornamos NaN se algo der errado
+                return float(fitness_score) if not np.isnan(fitness_score) else -np.inf
+
+        except Exception as e:
+            print(f"ERRO ao calcular o fitness Highpass para {output_h5_path}: {e}")
+            return -np.inf

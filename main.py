@@ -42,51 +42,82 @@ _simulation_results_directory = os.path.join(_project_directory, _simulation_res
 os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 3
+population_size = 1
 mutation_rate = 0.2
-num_generations = 2
+num_generations = 1
 
 # --- Ranges de Parâmetros ---
 s_range = (0.1e-6, 0.25e-6)
 w_range = (0.3e-6, 0.7e-6)
 l_range = (0.1e-6, 0.25e-6)
 height_range = (0.15e-6, 0.3e-6)
+total_length_range = (5e-6,50e-6) 
 
+# --- [MODIFICADO] Ponto Único de Configuração da Estratégia ---
+# Altere esta variável para escolher o objetivo da otimização.
+# Opções disponíveis: "delta_amp", "highpass", "lowpass", "bandpass"
+FITNESS_STRATEGY_NAME = "highpass"
 
-# --- [NOVO] Seleção da Estratégia de Fitness ---
-# Descomente a estratégia que deseja usar para a otimização.
-# Apenas UMA estratégia deve estar ativa por vez.
-# -------------------------------------------------------------
-# Opção 1: Maximizar o contraste do espectro (comportamento original)
-fitness_calculator = DeltaAmpStrategy()
+# --- Parâmetros para as Estratégias de Fitness ---
+# Ajuste os valores abaixo. O script usará os parâmetros relevantes
+# para a estratégia escolhida em FITNESS_STRATEGY_NAME.
+c = 299792458  # Velocidade da luz em m/s
 
-# Opção 2: Otimizar para um filtro passa-banda (ainda não implementado)
-# c = 299792458  # Velocidade da luz
-# center_wavelength = 1.55e-6
-# bandwidth_nm = 50e-9
-# f_center = c / center_wavelength
-# f_upper = c / (center_wavelength - bandwidth_nm / 2)
-# f_lower = c / (center_wavelength + bandwidth_nm / 2)
-# f_bandwidth = f_upper - f_lower
-# fitness_calculator = BandpassStrategy(center_freq=f_center, bandwidth=f_bandwidth)
+# Usado se FITNESS_STRATEGY_NAME = "highpass" ou "lowpass"
+# Lembre-se: Passa-ALTAS (frequência) = Passa-BAIXAS (comprimento de onda)
+CUTOFF_WAVELENGTH_NM = 1550
 
-# Opção 3: Otimizar para um filtro passa-baixas (ainda não implementado)
-# cutoff_wavelength = 1.5e-6
-# f_cutoff = c / cutoff_wavelength
-# fitness_calculator = LowpassStrategy(cutoff_freq=f_cutoff)
+# Usado se FITNESS_STRATEGY_NAME = "bandpass" (ainda não implementado)
+CENTER_WAVELENGTH_NM = 1550
+BANDWIDTH_NM = 50
 
-# Opção 4: Otimizar para um filtro passa-altas (ainda não implementado)
-# cutoff_wavelength = 1.6e-6
-# f_cutoff = c / cutoff_wavelength
-# fitness_calculator = HighpassStrategy(cutoff_freq=f_cutoff)
-# -------------------------------------------------------------
+# --- [NOVO] Lógica de Seleção da Estratégia (Switch Case) ---
+fitness_calculator = None
+print("--------------------------------------------------------------------------")
+print(f"Configurando a otimização...")
+
+if FITNESS_STRATEGY_NAME == "delta_amp":
+    fitness_calculator = DeltaAmpStrategy()
+    print(f"Estratégia selecionada: {fitness_calculator.__class__.__name__}")
+
+elif FITNESS_STRATEGY_NAME == "highpass":
+    cutoff_wavelength_m = CUTOFF_WAVELENGTH_NM * 1e-9
+    f_cutoff = c / cutoff_wavelength_m
+    fitness_calculator = HighpassStrategy(cutoff_freq=f_cutoff)
+    print(f"Estratégia selecionada: {fitness_calculator.__class__.__name__}")
+    print(f"--> Configuração Highpass: Frequência de corte = {f_cutoff/1e12:.2f} THz (λ = {CUTOFF_WAVELENGTH_NM} nm)")
+
+elif FITNESS_STRATEGY_NAME == "lowpass":
+    cutoff_wavelength_m = CUTOFF_WAVELENGTH_NM * 1e-9
+    f_cutoff = c / cutoff_wavelength_m
+    fitness_calculator = LowpassStrategy(cutoff_freq=f_cutoff)
+    print(f"Estratégia selecionada: {fitness_calculator.__class__.__name__} (Lógica a ser implementada)")
+    print(f"--> Configuração Lowpass: Frequência de corte = {f_cutoff/1e12:.2f} THz (λ = {CUTOFF_WAVELENGTH_NM} nm)")
+
+elif FITNESS_STRATEGY_NAME == "bandpass":
+    center_wavelength_m = CENTER_WAVELENGTH_NM * 1e-9
+    bandwidth_m = BANDWIDTH_NM * 1e-9 # Aproximação, cálculo real é mais complexo
+    f_center = c / center_wavelength_m
+    # Cálculo aproximado da largura de banda em frequência
+    f_upper = c / (center_wavelength_m - bandwidth_m / 2)
+    f_lower = c / (center_wavelength_m + bandwidth_m / 2)
+    f_bandwidth = f_upper - f_lower
+    fitness_calculator = BandpassStrategy(center_freq=f_center, bandwidth=f_bandwidth)
+    print(f"Estratégia selecionada: {fitness_calculator.__class__.__name__} (Lógica a ser implementada)")
+    print(f"--> Configuração Bandpass: Centro em {CENTER_WAVELENGTH_NM} nm, Largura de {BANDWIDTH_NM} nm")
+
+else:
+    raise ValueError(f"Estratégia de fitness '{FITNESS_STRATEGY_NAME}' é inválida. "
+                     f"Escolha entre: 'delta_amp', 'highpass', 'lowpass', 'bandpass'.")
+
 
 # --- Critério de Convergência ---
 enable_convergence_check = True
 CONVERGENCE_PATIENCE = 20
 
 # --- Limpeza de Debug ---
-debug_clean = True
+debug_clean = False
+
 print("--------------------------------------------------------------------------")
 print(f"Iniciando otimização com a estratégia: {fitness_calculator.__class__.__name__}")
 print("--------------------------------------------------------------------------")
@@ -99,7 +130,7 @@ if not os.path.exists(_temp_fsp_base_path):
 
 optimizer = GeneticOptimizer(
     population_size, mutation_rate, num_generations,
-    s_range, w_range, l_range, height_range
+    s_range, w_range, l_range, height_range, total_length_range
 )
 optimizer.initialize_population()
 current_population = optimizer.population
@@ -158,14 +189,14 @@ try:
             print(f"  [Relatório] Atualizando relatório para a Geração {gen_num + 1}...")
             record_experiment_results(
                 _simulation_results_directory, optimizer, experiment_start_time,
-                s_range, w_range, l_range, height_range, generations_processed
+                s_range, w_range, l_range, height_range, total_length_range, 
+                generations_processed
             )
             
             if all_individuals_data:
                 df_all_data = pd.DataFrame(all_individuals_data)
                 df_all_data.to_csv(full_data_csv_path, index=False)
                 print(f"  [Análise] Dados de {len(all_individuals_data)} indivíduos atualizados em CSV.")
-                # ATENÇÃO: pode ser necessário ajustar o analysis.py para usar a coluna 'fitness_score'
                 run_full_analysis(full_data_csv_path)
                 print(f"  [Análise] Gráficos de análise atualizados e salvos.")
 
