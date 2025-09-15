@@ -91,12 +91,12 @@ set("y", 0);
 set("z", 0);
 
 
-#addprofile ;
-#set("name","through");
-#set("monitor type",1);
-#set("x", last_x);
-#set("y", 0);
-#set("z", 0);
+addprofile ;
+set("name","through");
+set("monitor type",1);
+set("x", last_x);
+set("y", 0);
+set("z", 0);
 
 #addmodeexpansion;
 #set("name","in_mode_high");

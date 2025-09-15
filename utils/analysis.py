@@ -17,9 +17,9 @@ def run_full_analysis(csv_file_path):
         print("Dados carregados com sucesso!")
         print(f"Total de indivíduos analisados: {len(df)}")
         
-        df = df[df['delta_amp'] > -1e30]
+        df = df[df['fitness_score'] > -1e30]
         
-        params_and_fitness = ['s', 'w', 'l', 'height', 'delta_amp']
+        params_and_fitness = ['s', 'w', 'l', 'height', 'fitness_score']
         df_analysis = df[params_and_fitness]
 
         # Define os caminhos de saída baseados no nome do arquivo de entrada
@@ -41,7 +41,7 @@ def run_full_analysis(csv_file_path):
             fmt=".2f",
             linewidths=.5
         )
-        plt.title('Matriz de Correlação entre Parâmetros e Fitness (delta_amp)')
+        plt.title('Matriz de Correlação entre Parâmetros e Fitness')
         
         # MODIFICADO: Salva a figura e fecha para liberar memória
         plt.savefig(heatmap_output_path)
@@ -56,7 +56,7 @@ def run_full_analysis(csv_file_path):
             diag_kind='kde' # Mostra uma curva de densidade na diagonal
         )
         
-        pair_plot.fig.suptitle('Análise Visual de Pares entre Parâmetros e Fitness', y=1.02)
+        pair_plot.figure.suptitle('Análise Visual de Pares entre Parâmetros e Fitness', y=1.02)
         
         # MODIFICADO: Salva a figura e fecha para liberar memória
         pair_plot.savefig(pairplot_output_path)
@@ -66,7 +66,7 @@ def run_full_analysis(csv_file_path):
     except FileNotFoundError:
         print(f"Erro: O arquivo '{csv_file_path}' não foi encontrado.")
     except Exception as e:
-        print(f"Ocorreu um erro durante a análise: {e}")
+        print(f"Ocorreu um erro em analysis.py: {e}")
 
 
 if __name__ == '__main__':

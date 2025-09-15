@@ -69,10 +69,10 @@ class GeneticOptimizer:
         random.shuffle(self.population)
 
 
-    def calculate_fitness(self, delta_amp):
-        if np.isinf(delta_amp) or np.isnan(delta_amp):
+    def calculate_fitness(self, fitness):
+        if np.isinf(fitness) or np.isnan(fitness):
             return -float('inf')
-        return delta_amp
+        return fitness
 
 
     def select_parents(self):
@@ -121,15 +121,15 @@ class GeneticOptimizer:
         return chromosome
 
 
-    def evolve(self, current_generation_delta_amps):
-            if len(current_generation_delta_amps) != len(self.population):
-                raise ValueError("O número de resultados de delta_amp não corresponde ao tamanho da população.")
+    def evolve(self, current_generation_fitness):
+            if len(current_generation_fitness) != len(self.population):
+                raise ValueError("O número de resultados de fitness não corresponde ao tamanho da população.")
 
             current_generation_best_individual = None
             current_generation_best_fitness = -float('inf')
 
             for i, individual in enumerate(self.population):
-                individual_fitness = self.calculate_fitness(current_generation_delta_amps[i])
+                individual_fitness = self.calculate_fitness(current_generation_fitness[i])
                 individual['fitness'] = individual_fitness
 
                 # 1. Encontra o melhor indivíduo da GERAÇÃO ATUAL

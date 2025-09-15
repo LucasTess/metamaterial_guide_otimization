@@ -25,4 +25,3 @@ def clean_simulation_directory(directory_path, file_extension=None):
         except Exception as e:
             print(f"Erro ao remover o arquivo {file_path}: {e}")
 
-# A função remove_file não é mais necessária para o novo fluxo

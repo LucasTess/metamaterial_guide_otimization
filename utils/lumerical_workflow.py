@@ -1,4 +1,4 @@
-# lumerical_workflow.py
+# lumerical_workflow.py (Modificado para coletar Potência com getresult)
 
 import lumapi
 import os
@@ -6,27 +6,14 @@ import h5py
 import numpy as np
 import time
 
-def prepare_lumerical_job(fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path,temp_directory):
+def prepare_lumerical_job(fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path, temp_directory):
     """
     Prepara um único arquivo FSP com os parâmetros de um cromossomo e o salva com um nome único.
-    
-    Args:
-        fdtd: A instância da sessão Lumerical FDTD.
-        chromosome (dict): Um dicionário contendo os parâmetros do cromossomo.
-        fsp_base_path: O caminho base para o arquivo FSP temporário.
-        geometry_lsf_path: O caminho para o script LSF que cria a geometria.
-        simulation_lsf_path: O caminho para o script LSF que adiciona os elementos de simulação.
-        
-    Returns:
-        O caminho completo para o arquivo FSP salvo.
     """
     # Cria um nome de arquivo FSP único para o cromossomo
-    fsp_file_name = f"guide_temp_s{chromosome['s']:.2e}_w{chromosome['w']:.2e}.fsp"
-    # O arquivo temporário é salvo no mesmo diretório do arquivo base, ou em um diretório temporário.
-    print(f"temp_directory = " + temp_directory)
+    fsp_file_name = f"guide_temp_s{chromosome['s']:.2e}_w{chromosome['w']:.2e}_l{chromosome['l']:.2e}_h{chromosome['height']:.2e}.fsp"
     fsp_path = os.path.join(temp_directory, fsp_file_name)
-    print(f"fsp_path = " + fsp_path)
-    # Adicionando uma verificação defensiva para garantir que o arquivo base existe
+    
     if not os.path.exists(fsp_base_path):
         raise FileNotFoundError(f"Erro: O arquivo base '{fsp_base_path}' não foi encontrado.")
 
@@ -56,28 +43,17 @@ def prepare_lumerical_job(fdtd, chromosome, fsp_base_path, geometry_lsf_path, si
     return fsp_path
 
 def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geometry_lsf_path,
-                                  simulation_lsf_path, simulation_spectra_directory,temp_directory):
+                                  simulation_lsf_path, simulation_spectra_directory, temp_directory):
     """
     Prepara e executa as simulações para uma geração inteira de cromossomos usando a fila de jobs.
     Após a execução, lê os resultados de cada arquivo FSP e os salva em arquivos .h5.
-    
-    Args:
-        fdtd: A instância da sessão Lumerical FDTD.
-        current_population (list): Uma lista de dicionários, onde cada um representa um cromossomo.
-        fsp_base_path: O caminho base para o arquivo FSP temporário.
-        geometry_lsf_path: O caminho para o script LSF que cria a geometria.
-        simulation_lsf_path: O caminho para o script LSF que adiciona os elementos de simulação.
-        simulation_spectra_directory: O diretório onde os arquivos de saída .h5 serão salvos.
-        
-    Returns:
-        Uma lista completa dos caminhos para os arquivos de saída .h5.
     """
     fsp_paths_for_gen = []
     print(f"Preparando e adicionando {len(current_population)} jobs na fila...")
     
     for chromosome in current_population:
         fsp_path = prepare_lumerical_job(
-            fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path,temp_directory
+            fdtd, chromosome, fsp_base_path, geometry_lsf_path, simulation_lsf_path, temp_directory
         )
         fsp_paths_for_gen.append(fsp_path)
         
@@ -94,24 +70,29 @@ def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geome
 
     # --- Pós-processamento e salvamento em disco no Python ---
     output_h5_paths = []
-    monitor_name = 'in'
     for fsp_path in fsp_paths_for_gen:
         try:
             # 1. Carrega o arquivo FSP já simulado para extrair os dados
             fdtd.load(fsp_path)
             
-            # 2. Extrai os dados do monitor 'in'
-            Ex_complex = fdtd.getdata(f"{monitor_name}","Ex")
-            Ey_complex = fdtd.getdata(f"{monitor_name}","Ey")
-            Ez_complex = fdtd.getdata(f"{monitor_name}","Ez")
-
-            # 3. Calcula a magnitude do vetor campo elétrico
-            E = np.sqrt(np.abs(Ex_complex[0,0,0,:])**2 
-                                           + np.abs(Ey_complex[0,0,0,:])**2 
-                                           + np.abs(Ez_complex[0,0,0,:])**2)
-
-            f = fdtd.getdata("in","f")
+            # --- [MODIFICADO] Extração de dados de potência usando getresult ---
+            # Em vez de pegar os campos E e calcular a magnitude, pegamos o resultado de potência (P)
+            # que é pré-calculado pelo monitor do tipo 'port'.
             
+            # 2. Extrai os dados do port 'in'
+            port_in_result = fdtd.getresult("in", "P")
+            power_in = port_in_result['P'].flatten()  # Achatamos para garantir 1D
+            power_in = np.abs(power_in)
+            print("Pontencia in:")
+            print(power_in)
+            frequencies = port_in_result['f'].flatten()
+
+            # 3. Extrai os dados do port 'through'
+            port_through_result = fdtd.getresult("through", "P")
+            power_through = port_through_result['P'].flatten() # Achatamos para garantir 1D
+            power_through = np.abs(power_through)
+            print("Pontencia through")
+            print(power_through)           
             # 4. Define o nome do arquivo H5 com base nos parâmetros do cromossomo
             s_val = fdtd.getnamed("Guia Metamaterial", "s")
             w_val = fdtd.getnamed("Guia Metamaterial", "w")
@@ -121,10 +102,11 @@ def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geome
             h5_file_name = f"spectrum_s{s_val:.2e}_w{w_val:.2e}_l{l_val:.2e}_h{height_val:.2e}.h5"
             h5_path = os.path.join(simulation_spectra_directory, h5_file_name)
             
-            # 5. Salva os dados no arquivo H5 usando a biblioteca h5py
+            # --- [MODIFICADO] Salva os novos dados de potência no arquivo H5 ---
             with h5py.File(h5_path, 'w') as hf:
-                hf.create_dataset(f'{monitor_name}_spectrum_E_magnitude', data=E)
-                hf.create_dataset(f'frequencies_hz', data=f)
+                hf.create_dataset('frequencies_hz', data=frequencies)
+                hf.create_dataset('power_in', data=power_in)
+                hf.create_dataset('power_through', data=power_through)
             
             output_h5_paths.append(h5_path)
             
