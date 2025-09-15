@@ -12,7 +12,8 @@ def record_experiment_results(
     optimizer_instance, 
     experiment_start_time,
     s_range, w_range, l_range, height_range, total_length_range,
-    generations_processed
+    generations_processed,
+    fit_strategy
 ):
     timestamp_str = experiment_start_time.strftime('%Y%m%d_%H%M%S')
     results_path = os.path.join(output_directory, f"experiment_results_{timestamp_str}.json")
@@ -38,7 +39,8 @@ def record_experiment_results(
             "height": height_range,
             "total_length": total_length_range # [ADICIONADO] Novo range
         },
-        "fitness_history": optimizer_instance.fitness_history
+        "fitness_history": optimizer_instance.fitness_history,
+        "fitness_strategy": fit_strategy
     }
 
     try:
@@ -51,7 +53,7 @@ def record_experiment_results(
         plt.figure(figsize=(10, 6))
         generations = range(1, len(optimizer_instance.fitness_history) + 1)
         plt.plot(generations, optimizer_instance.fitness_history, marker='o', linestyle='-')
-        plt.title(f'Histórico de Fitness (Atualizado em: {current_time.strftime("%H:%M:%S")})')
+        plt.title(f'Histórico de Fitness (Atualizado em: {current_time.strftime("%H:%M:%S")}), {fit_strategy}')
         plt.xlabel('Geração')
         plt.ylabel('Melhor Fitness')
         plt.grid(True)

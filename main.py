@@ -115,8 +115,8 @@ else:
 enable_convergence_check = True
 CONVERGENCE_PATIENCE = 20
 
-# --- Limpeza de Debug ---
-debug_clean = False
+# --- Enable de limpeza dos arquivos para debug ---
+clean_enable = True
 
 print("--------------------------------------------------------------------------")
 print(f"Iniciando otimização com a estratégia: {fitness_calculator.__class__.__name__}")
@@ -177,6 +177,7 @@ try:
                 # --- [MODIFICADO] Nome da coluna de fitness genérico ---
                 individual_data['fitness_score'] = fitness_scores_for_gen[i]
                 individual_data['generation'] = gen_num + 1
+                individual_data['fitness_strategy'] = FITNESS_STRATEGY_NAME 
                 all_individuals_data.append(individual_data)
 
             try:
@@ -190,7 +191,7 @@ try:
             record_experiment_results(
                 _simulation_results_directory, optimizer, experiment_start_time,
                 s_range, w_range, l_range, height_range, total_length_range, 
-                generations_processed
+                generations_processed,FITNESS_STRATEGY_NAME
             )
             
             if all_individuals_data:
@@ -222,7 +223,7 @@ try:
         print(f"Melhor Fitness Score atingido: {optimizer.best_fitness:.4e}")
     else:
         print("Nenhum melhor indivíduo encontrado durante a otimização.")
-    if debug_clean:
+    if clean_enable:
         # --- Limpeza final ---
         clean_simulation_directory(_simulation_spectra_directory, file_extension=".h5")
         clean_simulation_directory(_temp_directory, file_extension=".fsp")

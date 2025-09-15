@@ -16,7 +16,8 @@ def run_full_analysis(csv_file_path):
         # [MODIFICADO] Adicionada a coluna 'total_length' para análise
         params_and_fitness = ['s', 'w', 'l', 'height', 'total_length', 'fitness_score']
         df_analysis = df[params_and_fitness]
-
+        fit_strategy = df['fitness_strategy']
+        fit_strategy = fit_strategy[0]
         output_directory = os.path.dirname(csv_file_path)
         base_filename = os.path.splitext(os.path.basename(csv_file_path))[0]
         
@@ -34,7 +35,7 @@ def run_full_analysis(csv_file_path):
             fmt=".2f",
             linewidths=.5
         )
-        plt.title('Matriz de Correlação entre Parâmetros e Fitness (fitness_score)')
+        plt.title(f'Matriz de Correlação entre Parâmetros e Fitness, {fit_strategy}')
         
         plt.savefig(heatmap_output_path)
         plt.close()
@@ -47,7 +48,7 @@ def run_full_analysis(csv_file_path):
             diag_kind='kde' 
         )
         
-        pair_plot.fig.suptitle('Análise Visual de Pares entre Parâmetros e Fitness', y=1.02)
+        pair_plot.figure.suptitle(f'Pairplot entre Parâmetros e Fitness, {fit_strategy}', y=1.02)
         
         pair_plot.savefig(pairplot_output_path)
         plt.close()
