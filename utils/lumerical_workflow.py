@@ -82,8 +82,8 @@ def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geome
             raw_power_through = port_through_result['P'].flatten()
             reshaped_power_through = raw_power_through.reshape(num_freq_points, 3)
             power_through = np.abs(reshaped_power_through[:, 0])
-            print("Power trhough:")
-            print(power_through)
+            #print("Power trhough:")
+            #print(power_through)
             # --- Fim da Correção ---
             
             s_val = fdtd.getnamed("Guia Metamaterial", "s")

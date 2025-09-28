@@ -42,9 +42,9 @@ _simulation_results_directory = os.path.join(_project_directory, _simulation_res
 os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 1
+population_size = 30
 mutation_rate = 0.2
-num_generations = 1
+num_generations = 120
 
 # --- Ranges de Parâmetros ---
 s_range = (0.1e-6, 0.25e-6)
