@@ -58,58 +58,58 @@ class LowpassStrategy(FitnessStrategy):
 
 class HighpassStrategy(FitnessStrategy):
     """
-    [IMPLEMENTADO - LÓGICA ROBUSTA v2] Estratégia para otimizar um filtro passa-altas.
-    Usa a MÉDIA para avaliar o desempenho geral da banda e penaliza a falta de
-    planicidade (alto desvio padrão), conforme a discussão.
+    [LÓGICA DE CURVA-ALVO] Estratégia que calcula o fitness com base na
+    similaridade entre a curva de transmissão simulada e uma curva
+    sigmoide ideal (filtro passa-altas).
     """
-    def __init__(self, cutoff_freq: float):
-        self.cutoff_freq = cutoff_freq
-        if cutoff_freq <= 0:
-            raise ValueError("A frequência de corte (cutoff_freq) deve ser um valor positivo.")
+    def __init__(self, frequencies: np.ndarray, f_cutoff: float, max_transmission: float, steepness: float):
+        """
+        Inicializa a estratégia e pré-calcula a curva-alvo.
+
+        Args:
+            frequencies (np.ndarray): O vetor de frequências da simulação.
+            f_cutoff (float): A frequência de corte do filtro alvo.
+            max_transmission (float): O nível de transmissão máximo desejado.
+            steepness (float): Um fator que controla a inclinação da transição.
+        """
+        self.target_curve = HighpassStrategy._create_target_sigmoid(
+            frequencies, f_cutoff, max_transmission, steepness
+        )
+        if self.target_curve.size == 0:
+            raise ValueError("A curva alvo (target_curve) não pode ser vazia.")
+
+    @staticmethod
+    def _create_target_sigmoid(frequencies: np.ndarray, f_cutoff: float, max_transmission: float, steepness: float) -> np.ndarray:
+        """ Gera a curva-alvo em forma de sigmoide. """
+        # A constante no expoente ajuda a normalizar o 'steepness'
+        k = steepness / (frequencies[-1] - frequencies[0])
+        return max_transmission / (1 + np.exp(-k * (frequencies - f_cutoff)))
 
     def calculate(self, output_h5_path: str) -> float:
+        """
+        Calcula o fitness como 1 / (1 + MSE), onde MSE é o erro quadrático
+        médio entre a curva simulada e a curva alvo.
+        """
         try:
             with h5py.File(output_h5_path, 'r') as f:
-                frequencies = f['frequencies_hz'][:]
                 power_in = f['power_in'][:]
                 power_through = f['power_through'][:]
 
                 epsilon = 1e-20
                 transmission = np.abs(power_through / (power_in + epsilon))
 
-                stop_band_mask = frequencies <= self.cutoff_freq
-                pass_band_mask = frequencies > self.cutoff_freq
-                
-                if not np.any(stop_band_mask) or not np.any(pass_band_mask):
-                    print(f"AVISO: A frequência de corte {self.cutoff_freq/1e12:.2f} THz está fora do range da simulação. O fitness será 0.")
-                    return 0.0
-                
-                T_pass = transmission[pass_band_mask]
-                T_stop = transmission[stop_band_mask]
+                if len(transmission) != len(self.target_curve):
+                    print(f"AVISO: Incompatibilidade de tamanho. T_simulado: {len(transmission)}, T_alvo: {len(self.target_curve)}")
+                    return -np.inf
 
-                # --- [LÓGICA ATUALIZADA CONFORME SUA SUGESTÃO] ---
-                
-                # 1. Calcula a MÉDIA de cada banda (para avaliar o desempenho homogêneo)
-                mean_pass = np.mean(T_pass)
-                mean_stop = np.mean(T_stop)
+                # Calcula o Erro Quadrático Médio (Mean Squared Error)
+                mse = np.mean((transmission - self.target_curve)**2)
 
-                # 2. Calcula o DESVIO PADRÃO de cada banda como uma métrica de "não-planicidade"
-                std_dev_pass = np.std(T_pass)
-                std_dev_stop = np.std(T_stop)
+                # Converte o erro em um score de fitness (valor máximo = 1)
+                fitness_score = 1.0 / (1.0 + mse)
 
-                # 3. A pontuação de contraste é a diferença das médias
-                contrast_score = mean_pass - mean_stop
-
-                # 4. A penalidade é a soma dos desvios padrão
-                flatness_penalty = std_dev_pass + std_dev_stop
-
-                # 5. O Fitness final recompensa o contraste e penaliza a falta de planicidade
-                fitness_score = contrast_score - flatness_penalty
-                
-                # --- Fim da Lógica Atualizada ---
-                
                 return float(fitness_score) if not np.isnan(fitness_score) else -np.inf
 
         except Exception as e:
-            print(f"ERRO ao calcular o fitness Highpass para {output_h5_path}: {e}")
+            print(f"ERRO ao calcular o fitness Highpass (TargetCurve) para {output_h5_path}: {e}")
             return -np.inf

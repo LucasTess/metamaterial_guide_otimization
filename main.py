@@ -42,9 +42,9 @@ _simulation_results_directory = os.path.join(_project_directory, _simulation_res
 os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 30
+population_size = 3
 mutation_rate = 0.2
-num_generations = 120
+num_generations = 2
 
 # --- Ranges de Parâmetros ---
 s_range = (0.1e-6, 0.25e-6)
@@ -71,6 +71,14 @@ CUTOFF_WAVELENGTH_NM = 1550
 CENTER_WAVELENGTH_NM = 1550
 BANDWIDTH_NM = 50
 
+# [AGORA USADO PELA NOVA 'highpass']
+# Comprimento de onda de corte para o filtro alvo.
+CUTOFF_WAVELENGTH_NM = 1550
+# Nível de transmissão desejado na banda passante (ex: 0.9 para 90%).
+TARGET_MAX_TRANSMISSION = 0.9
+# Quão íngreme a transição do filtro deve ser. Valores maiores = mais rápido. (ex: 5 a 50).
+TARGET_STEEPNESS = 30
+
 # --- [NOVO] Lógica de Seleção da Estratégia (Switch Case) ---
 fitness_calculator = None
 print("--------------------------------------------------------------------------")
@@ -80,13 +88,36 @@ if FITNESS_STRATEGY_NAME == "delta_amp":
     fitness_calculator = DeltaAmpStrategy()
     print(f"Estratégia selecionada: {fitness_calculator.__class__.__name__}")
 
+# --- [LÓGICA MODIFICADA] ---
 elif FITNESS_STRATEGY_NAME == "highpass":
+    print(f"Estratégia selecionada: HighpassStrategy (baseada em curva-alvo)")
+    
+    # Gera o vetor de frequências da simulação para criar a curva-alvo
+    lambda_start = 1.45e-6
+    lambda_stop = 1.62e-6
+    num_points = 500
+    
+    freq_start = c / lambda_stop
+    freq_stop = c / lambda_start
+    simulation_frequencies = np.linspace(freq_start, freq_stop, num_points)
+
+    # Define os parâmetros do filtro ideal
     cutoff_wavelength_m = CUTOFF_WAVELENGTH_NM * 1e-9
     f_cutoff = c / cutoff_wavelength_m
-    fitness_calculator = HighpassStrategy(cutoff_freq=f_cutoff)
-    print(f"Estratégia selecionada: {fitness_calculator.__class__.__name__}")
-    print(f"--> Configuração Highpass: Frequência de corte = {f_cutoff/1e12:.2f} THz (λ = {CUTOFF_WAVELENGTH_NM} nm)")
-
+    
+    # Instancia a HighpassStrategy, que agora aceita os parâmetros da curva-alvo
+    # e pré-calcula o "molde" ideal internamente.
+    fitness_calculator = HighpassStrategy(
+        frequencies=simulation_frequencies,
+        f_cutoff=f_cutoff,
+        max_transmission=TARGET_MAX_TRANSMISSION,
+        steepness=TARGET_STEEPNESS
+    )
+    
+    print(f"--> Configuração Alvo: Transmissão Max = {TARGET_MAX_TRANSMISSION*100}%, "
+          f"Inclinação = {TARGET_STEEPNESS}, "
+          f"Corte em {CUTOFF_WAVELENGTH_NM} nm")
+    
 elif FITNESS_STRATEGY_NAME == "lowpass":
     cutoff_wavelength_m = CUTOFF_WAVELENGTH_NM * 1e-9
     f_cutoff = c / cutoff_wavelength_m
