@@ -57,34 +57,24 @@ def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geome
     
     print("  [Job Manager] Todos os jobs da geração foram concluídos. Lendo e salvando os resultados...")
 
-    output_h5_paths = []
+    # --- [MODIFICADO] Lógica de pós-processamento robusta a falhas ---
+    output_results = [] # Esta lista conterá caminhos de arquivo ou None para falhas
     for fsp_path in fsp_paths_for_gen:
         try:
             fdtd.load(fsp_path)
             
-            # --- [CORRIGIDO] Lógica de extração de dados com reshape correto ---
-            
-            # 1. Extrai os dados brutos e a frequência
             port_in_result = fdtd.getresult("in", "P")
             raw_power_in = port_in_result['P'].flatten()
             frequencies = port_in_result['f'].flatten()
             num_freq_points = len(frequencies)
 
-            # 2. Remodela para (500, 3) -> 500 linhas (frequências), 3 colunas (Px, Py, Pz)
             reshaped_power_in = raw_power_in.reshape(num_freq_points, 3)
-
-            # 3. Seleciona a primeira COLUNA [:, 0], que contém todos os valores de Px
-            # Usamos np.abs para garantir que a potência seja positiva, pois Px pode ser negativo (fluxo reverso)
             power_in = np.abs(reshaped_power_in[:, 0])
 
-            # 4. Repete o processo para o monitor 'through'
             port_through_result = fdtd.getresult("through", "P")
             raw_power_through = port_through_result['P'].flatten()
             reshaped_power_through = raw_power_through.reshape(num_freq_points, 3)
             power_through = np.abs(reshaped_power_through[:, 0])
-            #print("Power trhough:")
-            #print(power_through)
-            # --- Fim da Correção ---
             
             s_val = fdtd.getnamed("Guia Metamaterial", "s")
             w_val = fdtd.getnamed("Guia Metamaterial", "w")
@@ -101,11 +91,15 @@ def simulate_generation_lumerical(fdtd, current_population, fsp_base_path, geome
                 hf.create_dataset('power_in', data=power_in)
                 hf.create_dataset('power_through', data=power_through)
             
-            output_h5_paths.append(h5_path)
+            # Adiciona o caminho do arquivo de sucesso à lista de resultados
+            output_results.append(h5_path)
             
             print(f"  Resultados do cromossomo salvo em: {os.path.basename(h5_path)}")
 
         except Exception as e:
             print(f"!!! Erro no pós-processamento do arquivo {os.path.basename(fsp_path)}: {e}")
+            # Adiciona None à lista de resultados para marcar a falha
+            output_results.append(None)
             
-    return output_h5_paths
+    # A função agora retorna uma lista com tamanho igual ao da população
+    return output_results

@@ -42,9 +42,9 @@ _simulation_results_directory = os.path.join(_project_directory, _simulation_res
 os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 3
+population_size = 40
 mutation_rate = 0.2
-num_generations = 2
+num_generations = 120
 
 # --- Ranges de Parâmetros ---
 s_range = (0.1e-6, 0.25e-6)
@@ -185,27 +185,34 @@ try:
             clean_simulation_directory(_temp_directory, file_extension=".fsp")
             clean_simulation_directory(_temp_directory, file_extension=".log")
             
-            h5_paths_for_gen = simulate_generation_lumerical(
+            h5_results_for_gen = simulate_generation_lumerical(
                 fdtd, current_population, _temp_fsp_base_path,
                 _geometry_lsf_script_path, _simulation_lsf_script_path,
                 _simulation_spectra_directory, _temp_directory
             )
             
             print("\n  [Job Manager] Pós-processando os resultados da geração...")
-            # --- [MODIFICADO] Lógica de cálculo de fitness genérica ---
+            # --- [MODIFICADO] Lógica de cálculo de fitness robusta a falhas ---
             fitness_scores_for_gen = []
-            for h5_path in h5_paths_for_gen:
+            for h5_path in h5_results_for_gen:
+                # Se o caminho for None, a simulação falhou. Atribui o pior fitness.
+                if h5_path is None:
+                    fitness_scores_for_gen.append(-np.inf)
+                    continue
+
+                # Se o caminho existir, calcula o fitness normalmente.
                 try:
-                    # A chamada agora usa o objeto 'fitness_calculator' selecionado
                     fitness_score = fitness_calculator.calculate(h5_path)
                 except Exception as e:
-                    print(f"!!! Erro no pós-processamento do arquivo {os.path.basename(h5_path)}: {e}")
-                    fitness_score = -float('inf')
+                    print(f"!!! Erro no cálculo do fitness para o arquivo {os.path.basename(h5_path)}: {e}")
+                    fitness_score = -np.inf
                 fitness_scores_for_gen.append(fitness_score)
+            
+            # A lista fitness_scores_for_gen agora sempre terá o tamanho correto (30)
 
             for i, chromosome in enumerate(current_population):
                 individual_data = chromosome.copy()
-                # --- [MODIFICADO] Nome da coluna de fitness genérico ---
+                # Esta linha agora é segura e não causará mais o IndexError
                 individual_data['fitness_score'] = fitness_scores_for_gen[i]
                 individual_data['generation'] = gen_num + 1
                 individual_data['fitness_strategy'] = FITNESS_STRATEGY_NAME 
