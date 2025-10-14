@@ -1,0 +1,45 @@
+{
+    "experiment_start_time": "2025-10-08T10:38:00.311855",
+    "last_update": "2025-10-08T10:41:38.198852",
+    "current_duration": "0:03:37.886997",
+    "generations_processed": 2,
+    "population_size": 3,
+    "mutation_rate": 0.2,
+    "max_generations_set": 2,
+    "best_individual_so_far": {
+        "s": 1.0894082056624406e-07,
+        "w": 4.1129734385537525e-07,
+        "l": 2.0305755705203794e-07,
+        "height": 1.5951226066632786e-07,
+        "total_length": 2.6275322164735175e-05,
+        "fitness": 0.3352052097731713
+    },
+    "best_fitness_so_far": 0.3352052097731713,
+    "parameter_ranges": {
+        "s": [
+            1e-07,
+            2.5e-07
+        ],
+        "w": [
+            3e-07,
+            7e-07
+        ],
+        "l": [
+            1e-07,
+            2.5e-07
+        ],
+        "height": [
+            1.5e-07,
+            3e-07
+        ],
+        "total_length": [
+            5e-06,
+            5e-05
+        ]
+    },
+    "fitness_history": [
+        0.3352052097731713,
+        0.3352052097731713
+    ],
+    "fitness_strategy": "highpass"
+}

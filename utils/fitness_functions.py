@@ -58,58 +58,74 @@ class LowpassStrategy(FitnessStrategy):
 
 class HighpassStrategy(FitnessStrategy):
     """
-    [LÓGICA DE CURVA-ALVO] Estratégia que calcula o fitness com base na
-    similaridade entre a curva de transmissão simulada e uma curva
-    sigmoide ideal (filtro passa-altas).
+    [LÓGICA DE ENGENHARIA] Estratégia multi-objetivo que avalia o fitness com
+    base em três características de engenharia de um filtro:
+    1. Score de Rejeição (baseado na pior fuga de sinal).
+    2. Score da Banda Passante (baseado na média e planicidade).
+    3. Score de Transição (baseado na "Elevação Total").
+    O fitness final é uma soma ponderada desses três scores.
     """
-    def __init__(self, frequencies: np.ndarray, f_cutoff: float, max_transmission: float, steepness: float):
-        """
-        Inicializa a estratégia e pré-calcula a curva-alvo.
-
-        Args:
-            frequencies (np.ndarray): O vetor de frequências da simulação.
-            f_cutoff (float): A frequência de corte do filtro alvo.
-            max_transmission (float): O nível de transmissão máximo desejado.
-            steepness (float): Um fator que controla a inclinação da transição.
-        """
-        self.target_curve = HighpassStrategy._create_target_sigmoid(
-            frequencies, f_cutoff, max_transmission, steepness
-        )
-        if self.target_curve.size == 0:
-            raise ValueError("A curva alvo (target_curve) não pode ser vazia.")
-
-    @staticmethod
-    def _create_target_sigmoid(frequencies: np.ndarray, f_cutoff: float, max_transmission: float, steepness: float) -> np.ndarray:
-        """ Gera a curva-alvo em forma de sigmoide. """
-        # A constante no expoente ajuda a normalizar o 'steepness'
-        k = steepness / (frequencies[-1] - frequencies[0])
-        return max_transmission / (1 + np.exp(-k * (frequencies - f_cutoff)))
-
+    def __init__(self, f_cutoff: float, transition_bandwidth: float, 
+                 w_rejection: float, w_passband: float, w_transition: float):
+        
+        self.f_cutoff = f_cutoff
+        self.transition_bandwidth = transition_bandwidth
+        self.w_rej = w_rejection
+        self.w_pass = w_passband
+        self.w_trans = w_transition
+    
     def calculate(self, output_h5_path: str) -> float:
-        """
-        Calcula o fitness como 1 / (1 + MSE), onde MSE é o erro quadrático
-        médio entre a curva simulada e a curva alvo.
-        """
         try:
             with h5py.File(output_h5_path, 'r') as f:
+                frequencies = f['frequencies_hz'][:]
                 power_in = f['power_in'][:]
                 power_through = f['power_through'][:]
-
                 epsilon = 1e-20
                 transmission = np.abs(power_through / (power_in + epsilon))
 
-                if len(transmission) != len(self.target_curve):
-                    print(f"AVISO: Incompatibilidade de tamanho. T_simulado: {len(transmission)}, T_alvo: {len(self.target_curve)}")
-                    return -np.inf
+                # --- 1. Definição das Bandas ---
+                f_min_transition = self.f_cutoff - (self.transition_bandwidth / 2)
+                f_max_transition = self.f_cutoff + (self.transition_bandwidth / 2)
 
-                # Calcula o Erro Quadrático Médio (Mean Squared Error)
-                mse = np.mean((transmission - self.target_curve)**2)
+                stop_band_mask = frequencies < f_min_transition
+                pass_band_mask = frequencies > f_max_transition
+                transition_mask = (frequencies >= f_min_transition) & (frequencies <= f_max_transition)
 
-                # Converte o erro em um score de fitness (valor máximo = 1)
-                fitness_score = 1.0 / (1.0 + mse)
+                # --- 2. Cálculo dos Scores Individuais Normalizados [0, 1] ---
 
-                return float(fitness_score) if not np.isnan(fitness_score) else -np.inf
+                # Score de Rejeição (quão perto de zero está a banda de rejeição)
+                T_stop = transmission[stop_band_mask]
+                if T_stop.size == 0:
+                    score_rej = 0.0
+                else:
+                    # Baseado no pior ponto (vazamento máximo)
+                    score_rej = 1.0 - np.max(T_stop)
+
+                # Score da Banda Passante (quão alta e plana é a banda passante)
+                T_pass = transmission[pass_band_mask]
+                if T_pass.size == 0:
+                    score_pass = 0.0
+                else:
+                    mean_pass = np.mean(T_pass)
+                    std_dev_pass = np.std(T_pass)
+                    # Penaliza a falta de planicidade. Não pode ser negativo.
+                    score_pass = max(0, mean_pass - std_dev_pass)
+
+                # Score de Transição (quão íngreme e monotônica é a transição)
+                T_transition = transmission[transition_mask]
+                if T_transition.size < 2:
+                    score_trans = 0.0
+                else:
+                    # Usa a "Elevação Total". Não pode ser negativo.
+                    score_trans = max(0, T_transition[-1] - T_transition[0])
+
+                # --- 3. Fitness Final Ponderado ---
+                final_fitness = (self.w_rej * score_rej + 
+                                 self.w_pass * score_pass + 
+                                 self.w_trans * score_trans)
+                
+                return float(final_fitness) if not np.isnan(final_fitness) else -np.inf
 
         except Exception as e:
-            print(f"ERRO ao calcular o fitness Highpass (TargetCurve) para {output_h5_path}: {e}")
+            print(f"ERRO ao calcular o fitness Highpass (Engenheiro) para {output_h5_path}: {e}")
             return -np.inf
