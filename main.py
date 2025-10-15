@@ -42,9 +42,17 @@ _simulation_results_directory = os.path.join(_project_directory, _simulation_res
 os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 50
+population_size = 3
 mutation_rate = 0.2
-num_generations = 160
+num_generations = 2
+
+# --- Critério de Convergência ---
+enable_convergence_check = True
+CONVERGENCE_PATIENCE = int(num_generations*0.2)
+if CONVERGENCE_PATIENCE < 20:
+    CONVERGENCE_PATIENCE = 20
+# --- Enable de limpeza dos arquivos para debug ---
+clean_enable = True
 
 # --- Ranges de Parâmetros ---
 s_range = (0.1e-6, 0.25e-6)
@@ -58,29 +66,16 @@ total_length_range = (5e-6,50e-6)
 FITNESS_STRATEGY_NAME = "highpass"
 
 # --- Parâmetros para as Estratégias de Fitness ---
-
 c = 299792458  # Velocidade da luz em m/s
 
-
 # Lembre-se: Passa-ALTAS (frequência) = Passa-BAIXAS (comprimento de onda)
-CUTOFF_WAVELENGTH_NM = 1460
-
-# Usado se FITNESS_STRATEGY_NAME = "bandpass" (ainda não implementado)
+CUTOFF_WAVELENGTH_NM = 1600
 CENTER_WAVELENGTH_NM = 1550
 BANDWIDTH_NM = 50
-# Nível de transmissão desejado na banda passante (ex: 0.9 para 90%).
-TARGET_MAX_TRANSMISSION = 0.9
-# Quão íngreme a transição do filtro deve ser. Valores maiores = mais rápido. (ex: 5 a 50).
-TARGET_STEEPNESS = 30
-# [NOVO] Largura da "janela de foco" para o bônus de inclinação.
+# Largura da "janela de foco" para o bônus de inclinação.
 # Define a região ao redor da frequência de corte onde a derivada será avaliada.
 # Ex: 5 THz = 5e12 Hz
 TRANSITION_BANDWIDTH_HZ = 5e12
-# Exemplo 1: Foco em Rejeição Máxima e Banda Passante de Qualidade
-#WEIGHT_REJECTION = 0.45   # 45% de importância
-#WEIGHT_PASSBAND = 0.45    # 45% de importância
-# WEIGHT_TRANSITION = 0.10  # 10% de importância (a inclinação é um bônus)
-
 # Exemplo 2: Foco em uma Transição Super Rápida
 WEIGHT_REJECTION = 0.30
 WEIGHT_PASSBAND = 0.50
@@ -120,38 +115,48 @@ elif FITNESS_STRATEGY_NAME == "highpass":
     print(f"--> Configuração: Corte em {CUTOFF_WAVELENGTH_NM} nm")
     
 elif FITNESS_STRATEGY_NAME == "lowpass":
+    print(f"Estratégia selecionada: LowpassStrategy ('Engenheiro Virtual')")
     cutoff_wavelength_m = CUTOFF_WAVELENGTH_NM * 1e-9
     f_cutoff = c / cutoff_wavelength_m
-    fitness_calculator = LowpassStrategy(cutoff_freq=f_cutoff)
-    print(f"Estratégia selecionada: {fitness_calculator.__class__.__name__} (Lógica a ser implementada)")
-    print(f"--> Configuração Lowpass: Frequência de corte = {f_cutoff/1e12:.2f} THz (λ = {CUTOFF_WAVELENGTH_NM} nm)")
+    fitness_calculator = LowpassStrategy(
+        f_cutoff=f_cutoff,
+        transition_bandwidth=TRANSITION_BANDWIDTH_HZ,
+        w_rejection=WEIGHT_REJECTION,
+        w_passband=WEIGHT_PASSBAND,
+        w_transition=WEIGHT_TRANSITION
+    )
+    print(f"--> Prioridades: Rejeição={WEIGHT_REJECTION*100}%, Banda Passante={WEIGHT_PASSBAND*100}%, Transição={WEIGHT_TRANSITION*100}%")
+    print(f"--> Configuração: Corte em {CUTOFF_WAVELENGTH_NM} nm")
 
 elif FITNESS_STRATEGY_NAME == "bandpass":
+    print(f"Estratégia selecionada: BandpassStrategy ('Engenheiro Virtual')")
     center_wavelength_m = CENTER_WAVELENGTH_NM * 1e-9
-    bandwidth_m = BANDWIDTH_NM * 1e-9 # Aproximação, cálculo real é mais complexo
     f_center = c / center_wavelength_m
-    # Cálculo aproximado da largura de banda em frequência
-    f_upper = c / (center_wavelength_m - bandwidth_m / 2)
-    f_lower = c / (center_wavelength_m + bandwidth_m / 2)
-    f_bandwidth = f_upper - f_lower
-    fitness_calculator = BandpassStrategy(center_freq=f_center, bandwidth=f_bandwidth)
-    print(f"Estratégia selecionada: {fitness_calculator.__class__.__name__} (Lógica a ser implementada)")
-    print(f"--> Configuração Bandpass: Centro em {CENTER_WAVELENGTH_NM} nm, Largura de {BANDWIDTH_NM} nm")
+    f_upper = c / (center_wavelength_m - (BANDWIDTH_NM * 1e-9 / 2))
+    f_lower = c / (center_wavelength_m + (BANDWIDTH_NM * 1e-9 / 2))
+    bandwidth_hz = f_upper - f_lower
+    fitness_calculator = BandpassStrategy(
+        f_center=f_center,
+        bandwidth=bandwidth_hz,
+        transition_bandwidth=TRANSITION_BANDWIDTH_HZ,
+        w_rejection=WEIGHT_REJECTION,
+        w_passband=WEIGHT_PASSBAND,
+        w_transition=WEIGHT_TRANSITION
+    )
+    print(f"--> Prioridades: Rejeição={WEIGHT_REJECTION*100}%, Banda Passante={WEIGHT_PASSBAND*100}%, Transição={WEIGHT_TRANSITION*100}%")
+    print(f"--> Configuração: Canal de {BANDWIDTH_NM} nm centrado em {CENTER_WAVELENGTH_NM} nm")
+
 
 else:
     raise ValueError(f"Estratégia de fitness '{FITNESS_STRATEGY_NAME}' é inválida. "
                      f"Escolha entre: 'delta_amp', 'highpass', 'lowpass', 'bandpass'.")
 
 
-# --- Critério de Convergência ---
-enable_convergence_check = True
-CONVERGENCE_PATIENCE = 20
 
-# --- Enable de limpeza dos arquivos para debug ---
-clean_enable = True
 
 print("--------------------------------------------------------------------------")
 print(f"Iniciando otimização com a estratégia: {fitness_calculator.__class__.__name__}")
+print(f"Paciência para convergência: {CONVERGENCE_PATIENCE}")
 print("--------------------------------------------------------------------------")
 
 shutil.copy(_original_fsp_path, _temp_fsp_base_path)
