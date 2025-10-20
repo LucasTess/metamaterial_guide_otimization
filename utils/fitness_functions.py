@@ -42,70 +42,67 @@ class DeltaAmpStrategy(FitnessStrategy):
 
 class BandpassStrategy(FitnessStrategy):
     """
-    [LÓGICA DE ENGENHARIA] Estratégia multi-objetivo para projetar um
-    filtro passa-banda, baseada em características de engenharia.
+    [LÓGICA DE ENGENHARIA v3] Estratégia multi-objetivo para projetar um
+    filtro passa-banda, julgando a transição pelo seu elo mais fraco.
     """
     def __init__(self, f_center: float, bandwidth: float, transition_bandwidth: float,
                  w_rejection: float, w_passband: float, w_transition: float):
-        
+
         self.f_center = f_center
         self.bandwidth = bandwidth
         self.transition_bandwidth = transition_bandwidth
         self.w_rej = w_rejection
         self.w_pass = w_passband
         self.w_trans = w_transition
-    
+        
+
     def calculate(self, output_h5_path: str) -> float:
         try:
             with h5py.File(output_h5_path, 'r') as f:
+                # ... (carregamento de dados e definição de máscaras inalterados) ...
                 frequencies = f['frequencies_hz'][:]
                 power_in = f['power_in'][:]
                 power_through = f['power_through'][:]
                 epsilon = 1e-20
                 transmission = np.abs(power_through / (power_in + epsilon))
 
-                # --- 1. Definição das Bordas das 5 Bandas ---
                 f_pass_min = self.f_center - (self.bandwidth / 2)
                 f_pass_max = self.f_center + (self.bandwidth / 2)
-                
                 f_trans1_min = f_pass_min - self.transition_bandwidth
                 f_trans2_max = f_pass_max + self.transition_bandwidth
                 
-                # --- 2. Definição das Máscaras ---
                 pass_band_mask = (frequencies >= f_pass_min) & (frequencies <= f_pass_max)
                 transition1_mask = (frequencies >= f_trans1_min) & (frequencies < f_pass_min)
                 transition2_mask = (frequencies > f_pass_max) & (frequencies <= f_trans2_max)
-                
-                # Máscara de Rejeição Unificada (lógica otimizada)
                 non_rejection_mask = (frequencies >= f_trans1_min) & (frequencies <= f_trans2_max)
                 stop_band_mask = ~non_rejection_mask
+                
+                # --- Cálculo dos Scores (com a correção) ---
 
-                # --- 3. Cálculo dos Scores Individuais ---
-
-                # Score de Rejeição (usa a máscara unificada)
+                # Score de Rejeição 
                 T_stop_all = transmission[stop_band_mask]
-                if T_stop_all.size == 0:
-                    score_rej = 0.0
-                else:
-                    score_rej = 1.0 - np.max(T_stop_all)
+                score_rej = 1.0 - np.max(T_stop_all) if T_stop_all.size > 0 else 0.0
 
-                # Score da Banda Passante
+                # Score da Banda Passante 
                 T_pass = transmission[pass_band_mask]
                 if T_pass.size == 0:
                     score_pass = 0.0
                 else:
-                    score_pass = max(0, np.mean(T_pass) - np.std(T_pass))
+                    mean_pass = np.mean(T_pass)
+                    std_dev_pass = np.std(T_pass)
+                    score_pass = max(0, mean_pass - std_dev_pass)
 
-                # Score de Transição (média da qualidade das duas bordas)
+                #Score de Transição
                 T_trans1 = transmission[transition1_mask]
                 score_trans1 = max(0, T_trans1[-1] - T_trans1[0]) if T_trans1.size >= 2 else 0.0 # Subida
                 
                 T_trans2 = transmission[transition2_mask]
                 score_trans2 = max(0, T_trans2[0] - T_trans2[-1]) if T_trans2.size >= 2 else 0.0 # Queda
                 
-                score_trans = (score_trans1 + score_trans2) / 2.0
+                # A qualidade da transição geral é a qualidade da PIOR das duas bordas.
+                score_trans = min(score_trans1, score_trans2)
 
-                # --- 4. Fitness Final Ponderado ---
+                # --- Fitness Final Ponderado (inalterado) ---
                 final_fitness = (self.w_rej * score_rej + 
                                  self.w_pass * score_pass + 
                                  self.w_trans * score_trans)

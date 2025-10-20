@@ -51,6 +51,7 @@ enable_convergence_check = True
 CONVERGENCE_PATIENCE = int(num_generations*0.2)
 if CONVERGENCE_PATIENCE < 20:
     CONVERGENCE_PATIENCE = 20
+
 # --- Enable de limpeza dos arquivos para debug ---
 clean_enable = True
 
@@ -58,12 +59,12 @@ clean_enable = True
 s_range = (0.1e-6, 0.25e-6)
 w_range = (0.3e-6, 0.7e-6)
 l_range = (0.1e-6, 0.25e-6)
-height_range = (0.15e-6, 0.3e-6)
+height_range = (0.22e-6, 0.22e-6)
 total_length_range = (5e-6,50e-6) 
 
 
 # Opções disponíveis: "delta_amp", "highpass", "lowpass", "bandpass"
-FITNESS_STRATEGY_NAME = "highpass"
+FITNESS_STRATEGY_NAME = "bandpass"
 
 # --- Parâmetros para as Estratégias de Fitness ---
 c = 299792458  # Velocidade da luz em m/s
@@ -78,15 +79,15 @@ BANDWIDTH_NM = 50
 TRANSITION_BANDWIDTH_HZ = 5e12
 # Exemplo 2: Foco em uma Transição Super Rápida
 WEIGHT_REJECTION = 0.30
-WEIGHT_PASSBAND = 0.50
-WEIGHT_TRANSITION = 0.20
+WEIGHT_PASSBAND = 0.30
+WEIGHT_TRANSITION = 0.40
 
 # --- Verificação de Sanidade dos Pesos ---
 if not np.isclose(WEIGHT_REJECTION + WEIGHT_PASSBAND + WEIGHT_TRANSITION, 1.0):
     print("AVISO: A soma dos pesos da função de fitness não é 1.0! O fitness final não estará normalizado.")
 
 
-fitness_calculator = None
+fitness_calculator = "bandpass"
 print("--------------------------------------------------------------------------")
 print(f"Configurando a otimização...")
 
