@@ -42,9 +42,9 @@ _simulation_results_directory = os.path.join(_project_directory, _simulation_res
 os.makedirs(_simulation_spectra_directory, exist_ok=True)
 
 # --- Configuração do Algoritmo Genético ---
-population_size = 3
+population_size = 50
 mutation_rate = 0.2
-num_generations = 2
+num_generations = 160
 
 # --- Critério de Convergência ---
 enable_convergence_check = True
